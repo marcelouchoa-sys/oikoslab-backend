@@ -1,0 +1,7 @@
+Cria o arquivo runtime.txt com o conteúdo:
+python-3.11.9
+
+E cria o arquivo Procfile com o conteúdo:
+web: uvicorn main:app --host 0.0.0.0 --port $PORT
+
+Depois faz git add, commit e push.
