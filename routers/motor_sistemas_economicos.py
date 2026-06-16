@@ -3,14 +3,15 @@
 Motor de resolução de sistemas econômicos simbólicos.
 
 Recebe expressões SymPy nativas e retorna soluções estruturadas.
-Para equação única, delega para modelo_proprio._resolver_sistema
+Para equação única, delega para services.motor_sistemas.resolve_sistema
 sem duplicar a lógica de resolução escalar.
 """
 
 import sympy as sp
 from typing import Optional
 
-from routers.modelo_proprio import Equacao as _MPEquacao, _resolver_sistema as _mp_resolve
+from routers.modelo_proprio import Equacao as _MPEquacao
+from services.motor_sistemas import resolve_sistema as _mp_resolve
 
 
 # ─────────────────────────────────────────────────────────────────────────────

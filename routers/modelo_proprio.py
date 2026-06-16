@@ -17,6 +17,8 @@ from pydantic import BaseModel
 import sympy as sp
 import numpy as np
 
+from services.motor_sistemas import resolve_sistema as _resolver_sistema, _split_equacao
+
 router = APIRouter()
 
 
@@ -54,19 +56,6 @@ class ModeloInput(BaseModel):
 # =============================================================
 #  HELPERS
 # =============================================================
-def _split_equacao(eq: Equacao):
-    """
-    Normaliza uma equacao em (lhs_str, rhs_str).
-    Aceita 'C = a + c*Y' OU variavel='C', expressao='a + c*Y'.
-    """
-    expr = eq.expressao.strip()
-    if "=" in expr:
-        lhs, rhs = expr.split("=", 1)
-        return lhs.strip(), rhs.strip()
-    # sem '=': usa o campo variavel como lhs
-    return eq.variavel.strip(), expr
-
-
 def _detectar(equacoes: list[Equacao], param_nomes: set[str]):
     """
     OBJETIVO 1: separa endogenas de parametros.
@@ -97,66 +86,6 @@ def _detectar(equacoes: list[Equacao], param_nomes: set[str]):
             todos.add(lhs)
 
     return endogenas, lhs_list, todos
-
-
-def _resolver_sistema(equacoes, valores_param: dict, endogenas: set):
-    """
-    OBJETIVO 2: monta e resolve o sistema simultaneo.
-    Substitui parametros por valores e resolve para as endogenas.
-    Retorna (solucao_dict, solucao_simbolica_dict, erros).
-    """
-    erros = []
-    simbolos = {v: sp.Symbol(v) for v in endogenas}
-    param_subs = {sp.Symbol(k): v for k, v in valores_param.items()}
-
-    sistema = []
-    for eq in equacoes:
-        lhs, rhs = _split_equacao(eq)
-        if not lhs or not rhs:
-            continue
-        try:
-            lhs_e = sp.sympify(lhs, locals=simbolos)
-            rhs_e = sp.sympify(rhs, locals=simbolos)
-            sistema.append(sp.Eq(lhs_e, rhs_e))
-        except Exception as e:
-            erros.append(f"Erro ao interpretar '{lhs} = {rhs}': {e}")
-
-    if not sistema:
-        return {}, {}, erros or ["Nenhuma equacao valida."]
-
-    incognitas = list(simbolos.values())
-
-    # 1) solucao SIMBOLICA (parametros como letras) -> habilita derivadas
-    sol_simbolica = {}
-    try:
-        sol = sp.solve(sistema, incognitas, dict=True)
-        if sol:
-            sol_simbolica = sol[0]
-    except Exception as e:
-        erros.append(f"Solucao simbolica falhou: {e}")
-
-    # 2) solucao NUMERICA (substitui valores)
-    sol_numerica = {}
-    try:
-        sistema_num = [eq.subs(param_subs) for eq in sistema]
-        sol = sp.solve(sistema_num, incognitas, dict=True)
-        if sol:
-            for var, val in sol[0].items():
-                try:
-                    sol_numerica[str(var)] = float(val.evalf())
-                except Exception:
-                    pass
-        elif sol_simbolica:
-            # fallback: avaliar a solucao simbolica nos valores
-            for var, expr in sol_simbolica.items():
-                try:
-                    sol_numerica[str(var)] = float(expr.subs(param_subs).evalf())
-                except Exception:
-                    pass
-    except Exception as e:
-        erros.append(f"Solucao numerica falhou: {e}")
-
-    return sol_numerica, sol_simbolica, erros
 
 
 # =============================================================
