@@ -20,7 +20,6 @@ import numpy as np
 from services.motor_sistemas import resolve_sistema as _resolver_sistema, _split_equacao
 from services.validador import (
     classificar_variaveis,
-    normalizar_sistema,
     validar_restricoes_economicas,
     validar_solucao,
     simular_cenario as _simular_cenario,
@@ -241,36 +240,50 @@ def resolver_modelo(modelo: ModeloInput) -> dict:
     valores_param = {p.nome: p.valor for p in modelo.parametros}
     param_nomes = set(valores_param.keys())
 
-    # ---- LaTeX (sempre, mesmo se nao resolver) ----
-    for eq in modelo.equacoes:
+    # ── ETAPA 1: NORMALIZAÇÃO (antes de qualquer outro processamento) ────────
+    # Deduplicar preservando objetos Equacao originais (não apenas strings)
+    _vistas_canon: set[str] = set()
+    equacoes_unicas: list[Equacao] = []
+    for _eq in modelo.equacoes:
+        _lhs, _rhs = _split_equacao(_eq)
+        if not _lhs or not _rhs:
+            continue
+        try:
+            _canon = str(sp.expand(sp.sympify(_lhs) - sp.sympify(_rhs)))
+        except Exception:
+            _canon = f"{_lhs}={_rhs}"
+        if _canon not in _vistas_canon:
+            _vistas_canon.add(_canon)
+            equacoes_unicas.append(_eq)
+    equacoes_norm = [f"{_split_equacao(e)[0].strip()} = {_split_equacao(e)[1].strip()}" for e in equacoes_unicas]
+
+    # ── ETAPA 2: CLASSIFICAÇÃO DE VARIÁVEIS ──────────────────────────────────
+    classificacao = classificar_variaveis(equacoes_unicas, valores_param)
+
+    # ── ETAPA 3: LaTeX das equações de entrada ────────────────────────────────
+    for eq in equacoes_unicas:
         lhs, rhs = _split_equacao(eq)
         try:
             latex_map[lhs or eq.nome] = f"{lhs} = {sp.latex(sp.sympify(rhs))}"
         except Exception:
             latex_map[lhs or eq.nome] = f"{lhs} = {rhs}"
 
-    # ---- OBJ 1: detectar endogenas ----
-    endogenas, _, todos = _detectar(modelo.equacoes, param_nomes)
-    endogenas_lhs = set(endogenas)  # somente símbolos definidos no lado esquerdo
+    # ── ETAPA 4: DETECÇÃO DE ENDÓGENAS ───────────────────────────────────────
+    endogenas, _, todos = _detectar(equacoes_unicas, param_nomes)
+    endogenas_lhs = set(endogenas)
     param_detectados = todos - endogenas
     faltando = param_detectados - param_nomes
     if faltando:
-        # Sem valor explícito → variável endógena, não parâmetro fixado em 0.
-        # SymPy resolve o sistema ou expressa a solução em termos dos símbolos livres.
         endogenas |= faltando
         param_detectados = todos - endogenas
-
-    # Ordem importa: LHS primeiro, faltando por último.
-    # SymPy usa eliminação gaussiana: variáveis ao final tendem a ser
-    # deixadas como parâmetros livres em sistemas subdeterminados.
     endogenas_ordered = sorted(endogenas_lhs) + sorted(faltando)
 
-    # ---- OBJ 2: resolver sistema ----
-    sol_num, sol_sym, errs = _resolver_sistema(modelo.equacoes, valores_param, endogenas_ordered)
+    # ── ETAPA 5: RESOLUÇÃO SIMBÓLICA/NUMÉRICA ────────────────────────────────
+    sol_num, sol_sym, errs = _resolver_sistema(equacoes_unicas, valores_param, endogenas_ordered)
     erros += errs
     valores = sol_num
+    sol_simbolica_str = {str(k): str(v) for k, v in sol_sym.items()} if sol_sym else {}
 
-    # Soluções simbólicas → LaTeX (visible quando solução numérica não existe)
     if sol_sym:
         for var, expr in sol_sym.items():
             try:
@@ -278,13 +291,11 @@ def resolver_modelo(modelo: ModeloInput) -> dict:
             except Exception:
                 latex_map[f"sol_{var}"] = f"{var} = {str(expr)}"
 
-    # ---- CAMADAS DE VALIDAÇÃO -----------------------------------------------
-    equacoes_norm     = normalizar_sistema(modelo.equacoes)
-    classificacao     = classificar_variaveis(modelo.equacoes, valores_param)
-    warnings_econ     = validar_restricoes_economicas(valores)
-    erros_consist     = validar_solucao(modelo.equacoes, valores)
-    sol_simbolica_str = {str(k): str(v) for k, v in sol_sym.items()} if sol_sym else {}
-    # -------------------------------------------------------------------------
+    # ── ETAPA 6: VALIDAÇÃO DA SOLUÇÃO ────────────────────────────────────────
+    erros_consist = validar_solucao(equacoes_unicas, valores)
+
+    # ── ETAPA 7: VALIDAÇÃO ECONÔMICA ─────────────────────────────────────────
+    warnings_econ = validar_restricoes_economicas(valores)
 
     # ---- OBJ 5: elasticidades / derivadas analiticas ----
     # para cada endogena resolvida simbolicamente, dEndogena/dParametro
@@ -335,7 +346,7 @@ def resolver_modelo(modelo: ModeloInput) -> dict:
 
     return {
         # ── Campos legados (compatibilidade com frontend) ─────────────────────
-        "status": "ok" if not (erros or warnings_econ) else "parcial",
+        "status": "ok" if not erros else "parcial",
         "valores": valores,
         "endogenas": sorted(endogenas),
         "parametros_detectados": sorted(param_detectados),
