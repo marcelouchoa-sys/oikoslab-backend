@@ -231,19 +231,32 @@ def resolver_modelo(modelo: ModeloInput) -> dict:
 
     # ---- OBJ 1: detectar endogenas ----
     endogenas, _, todos = _detectar(modelo.equacoes, param_nomes)
-    # parametros = simbolos que nao sao endogenas
+    endogenas_lhs = set(endogenas)  # somente símbolos definidos no lado esquerdo
     param_detectados = todos - endogenas
-    # avisar se faltam valores de parametros
     faltando = param_detectados - param_nomes
     if faltando:
-        erros.append(f"Parametros sem valor (serao tratados como 0): {', '.join(sorted(faltando))}")
-        for f in faltando:
-            valores_param.setdefault(f, 0.0)
+        # Sem valor explícito → variável endógena, não parâmetro fixado em 0.
+        # SymPy resolve o sistema ou expressa a solução em termos dos símbolos livres.
+        endogenas |= faltando
+        param_detectados = todos - endogenas
+
+    # Ordem importa: LHS primeiro, faltando por último.
+    # SymPy usa eliminação gaussiana: variáveis ao final tendem a ser
+    # deixadas como parâmetros livres em sistemas subdeterminados.
+    endogenas_ordered = sorted(endogenas_lhs) + sorted(faltando)
 
     # ---- OBJ 2: resolver sistema ----
-    sol_num, sol_sym, errs = _resolver_sistema(modelo.equacoes, valores_param, endogenas)
+    sol_num, sol_sym, errs = _resolver_sistema(modelo.equacoes, valores_param, endogenas_ordered)
     erros += errs
     valores = sol_num
+
+    # Soluções simbólicas → LaTeX (visible quando solução numérica não existe)
+    if sol_sym:
+        for var, expr in sol_sym.items():
+            try:
+                latex_map[f"sol_{var}"] = f"{var} = {sp.latex(expr)}"
+            except Exception:
+                latex_map[f"sol_{var}"] = f"{var} = {str(expr)}"
 
     # ---- OBJ 5: elasticidades / derivadas analiticas ----
     # para cada endogena resolvida simbolicamente, dEndogena/dParametro

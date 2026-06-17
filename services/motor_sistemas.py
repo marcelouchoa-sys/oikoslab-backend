@@ -20,7 +20,7 @@ def _split_equacao(eq) -> tuple[str, str]:
 def resolve_sistema(
     equacoes: list,
     valores_param: dict,
-    endogenas: set,
+    endogenas,
 ) -> tuple[dict, dict, list]:
     """
     Resolve sistema simultâneo de equações econômicas.
@@ -28,16 +28,21 @@ def resolve_sistema(
     Args:
         equacoes     : lista de objetos com .expressao (str) e .variavel (str)
         valores_param: {nome_param: float} — parâmetros exógenos
-        endogenas    : set[str] — nomes das variáveis a resolver
+        endogenas    : iterable[str] — nomes das variáveis a resolver.
+                       Se list, a ORDEM é preservada: variáveis ao final tendem
+                       a ser escolhidas como parâmetros livres em sistemas
+                       subdeterminados (comportamento SymPy com eliminação gaussiana).
 
     Returns:
         (sol_numerica, sol_simbolica, erros)
-        - sol_numerica : {str: float}
-        - sol_simbolica: {Symbol: Expr}  (útil para elasticidades e séries)
+        - sol_numerica : {str: float | str} — float quando determinado, str quando simbólico
+        - sol_simbolica: {Symbol: Expr}     — útil para elasticidades e séries
         - erros        : list[str]
     """
     erros: list[str] = []
-    simbolos = {v: sp.Symbol(v) for v in endogenas}
+    # Preserva ordem se lista/tupla; ordena se set (sem ordem garantida)
+    endogenas_seq = endogenas if isinstance(endogenas, (list, tuple)) else sorted(endogenas)
+    simbolos = {v: sp.Symbol(v) for v in endogenas_seq}
     param_subs = {sp.Symbol(k): v for k, v in valores_param.items()}
 
     sistema: list[sp.Equality] = []
@@ -67,23 +72,26 @@ def resolve_sistema(
         erros.append(f"Solução simbólica falhou: {e}")
 
     # Solução numérica — substitui valores dos parâmetros
-    sol_numerica: dict[str, float] = {}
+    # Retorna float quando totalmente determinado; str simbólico quando há variáveis livres.
+    sol_numerica: dict = {}
     try:
         sistema_num = [eq.subs(param_subs) for eq in sistema]
         sol = sp.solve(sistema_num, incognitas, dict=True)
         if sol:
             for var, val in sol[0].items():
+                evaluated = val.subs(param_subs)
                 try:
-                    sol_numerica[str(var)] = float(val.evalf())
+                    sol_numerica[str(var)] = float(evaluated.evalf())
                 except Exception:
-                    pass
+                    sol_numerica[str(var)] = str(val)
         elif sol_simbolica:
             # fallback: avalia solução simbólica com os valores fornecidos
             for var, expr in sol_simbolica.items():
+                evaluated = expr.subs(param_subs)
                 try:
-                    sol_numerica[str(var)] = float(expr.subs(param_subs).evalf())
+                    sol_numerica[str(var)] = float(evaluated.evalf())
                 except Exception:
-                    pass
+                    sol_numerica[str(var)] = str(evaluated)
     except Exception as e:
         erros.append(f"Solução numérica falhou: {e}")
 
