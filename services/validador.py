@@ -2,38 +2,68 @@
 Camada de validação econômica e engine de cenários.
 
 Funções puras — sem dependências HTTP ou Pydantic.
+
+Contratos internos
+──────────────────
+ValidationResult  → {valid, warnings, errors, violations}
+SolverOutput      → {variables, expressions, metadata}
 """
 import sympy as sp
+from typing import TypedDict
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  RESTRIÇÕES ECONÔMICAS
+#  CONTRATOS INTERNOS (typed dicts)
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Gravidade da violação por variável (usada no campo warnings.gravidade)
-_GRAVIDADE: dict[str, str] = {
-    'r': 'alta',   'i': 'alta',  'Y': 'alta',  'P': 'alta',
-    'C': 'media',  'I': 'media', 'Qd': 'media','Qs': 'media',
-    'W': 'media',  'L': 'media', 'kstar': 'media',
-    'G': 'baixa',
-}
+class ValidationResult(TypedDict):
+    valid:      bool    # False quando há errors (violações bloqueantes)
+    warnings:   list    # violações não-bloqueantes (modo "warning")
+    errors:     list    # violações bloqueantes
+    violations: list    # todas as violações (warnings + errors)
 
-# variável → (mínimo_aceitável, mensagem_de_violação)
-# None como mínimo = sem restrição (ex: inflação pode ser negativa)
-_RESTRICOES: dict[str, tuple[float | None, str]] = {
-    'r':    (0.0, 'Taxa de juros negativa (inviável economicamente)'),
-    'i':    (0.0, 'Taxa de juros negativa (inviável economicamente)'),
-    'Y':    (0.0, 'Produto negativo (inviável economicamente)'),
-    'C':    (0.0, 'Consumo negativo (inviável economicamente)'),
-    'I':    (0.0, 'Investimento negativo (inviável economicamente)'),
-    'G':    (0.0, 'Gasto do governo negativo'),
-    'Qd':   (0.0, 'Quantidade demandada negativa'),
-    'Qs':   (0.0, 'Quantidade ofertada negativa'),
-    'P':    (0.0, 'Preço negativo (inviável em mercados reais)'),
-    'W':    (0.0, 'Salário negativo'),
-    'L':    (0.0, 'Nível de emprego negativo'),
-    'kstar':(0.0, 'Capital por trabalhador negativo'),
-    'pi':   (None, ''),  # inflação: deflação é possível
+
+class SolverOutput(TypedDict):
+    variables:   dict   # {str: float | str}
+    expressions: dict   # {str: str} — solução simbólica
+    metadata:    dict   # {endogenas, parametros, erros}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  MATRIZ DE REGRAS ECONÔMICAS
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# bloqueante_sempre=True  → vai para errors[] em QUALQUER modo (sempre bloqueia)
+# bloqueante_sempre=False → vai para warnings[] em "warning"; errors[] em "fail_fast"
+
+_REGRAS_ECONOMICAS: dict[str, dict] = {
+    'Y':     {'min': 0.0, 'gravidade': 'alta',  'bloqueante_sempre': True,
+               'mensagem': 'Produto negativo (inviável economicamente)'},
+    'C':     {'min': 0.0, 'gravidade': 'alta',  'bloqueante_sempre': True,
+               'mensagem': 'Consumo negativo (inviável economicamente)'},
+    'I':     {'min': 0.0, 'gravidade': 'media', 'bloqueante_sempre': True,
+               'mensagem': 'Investimento negativo (inviável economicamente)'},
+    'P':     {'min': 0.0, 'gravidade': 'alta',  'bloqueante_sempre': True,
+               'mensagem': 'Preço negativo (inviável em mercados reais)'},
+    'Qd':    {'min': 0.0, 'gravidade': 'media', 'bloqueante_sempre': True,
+               'mensagem': 'Quantidade demandada negativa'},
+    'Qs':    {'min': 0.0, 'gravidade': 'media', 'bloqueante_sempre': True,
+               'mensagem': 'Quantidade ofertada negativa'},
+    # ── warning por padrão; fail_fast opcional ────────────────────────────────
+    'r':     {'min': 0.0, 'gravidade': 'alta',  'bloqueante_sempre': False,
+               'mensagem': 'Taxa de juros negativa (inviável economicamente)'},
+    'i':     {'min': 0.0, 'gravidade': 'alta',  'bloqueante_sempre': False,
+               'mensagem': 'Taxa de juros negativa (inviável economicamente)'},
+    'G':     {'min': 0.0, 'gravidade': 'baixa', 'bloqueante_sempre': False,
+               'mensagem': 'Gasto do governo negativo'},
+    'W':     {'min': 0.0, 'gravidade': 'media', 'bloqueante_sempre': False,
+               'mensagem': 'Salário negativo'},
+    'L':     {'min': 0.0, 'gravidade': 'media', 'bloqueante_sempre': False,
+               'mensagem': 'Nível de emprego negativo'},
+    'kstar': {'min': 0.0, 'gravidade': 'media', 'bloqueante_sempre': False,
+               'mensagem': 'Capital por trabalhador negativo'},
+    'pi':    {'min': None, 'gravidade': 'baixa', 'bloqueante_sempre': False,
+               'mensagem': ''},  # deflação é possível — sem restrição
 }
 
 # Lista legível das restrições para o campo "restricoes" do output
@@ -49,6 +79,9 @@ RESTRICOES_PADRAO: list[str] = [
     'L ≥ 0  — emprego não-negativo',
 ]
 
+# Tolerância numérica para consistência estrutural
+_EPSILON = 1e-6
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  1. VARIABLE CLASSIFICATION LAYER
@@ -61,10 +94,6 @@ def classificar_variaveis(equacoes: list, parametros: dict) -> dict:
     Endógena : aparece no sistema e NÃO tem valor em parametros.
     Exógena  : tem valor explícito em parametros.
     Nunca assume valor 0 para símbolos não definidos.
-
-    Args:
-        equacoes  : lista de objetos com .expressao e .variavel
-        parametros: dict {nome: valor} dos parâmetros explícitos
 
     Returns:
         {'endogenas': list[str], 'exogenas': list[str]}
@@ -88,15 +117,12 @@ def classificar_variaveis(equacoes: list, parametros: dict) -> dict:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  3. EQUATION DEDUPLICATION LAYER
+#  2. EQUATION DEDUPLICATION LAYER
 # ─────────────────────────────────────────────────────────────────────────────
 
 def normalizar_sistema(equacoes: list) -> list[str]:
     """
     Remove duplicatas simbólicas e normaliza para 'lhs = rhs'.
-
-    Duplicata: lhs − rhs == 0 após sp.expand (comparação de string na forma
-    expandida — rápido e suficiente para modelos econômicos lineares).
 
     Returns:
         lista de strings 'lhs = rhs' sem duplicatas.
@@ -124,49 +150,127 @@ def normalizar_sistema(equacoes: list) -> list[str]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  2. ECONOMIC CONSTRAINT LAYER
+#  3. ECONOMIC CONSTRAINT LAYER
 # ─────────────────────────────────────────────────────────────────────────────
 
-def validar_restricoes_economicas(solucao: dict) -> list[dict]:
+def validar_restricoes_economicas(solucao: dict, modo: str = "warning") -> ValidationResult:
     """
-    Verifica restrições mínimas de viabilidade econômica.
-    NÃO bloqueia a solução — retorna apenas warnings.
+    Verifica restrições mínimas de viabilidade econômica contra _REGRAS_ECONOMICAS.
+
+    bloqueante_sempre=True  → sempre vai para errors[] (bloqueia em qualquer modo)
+    bloqueante_sempre=False → warnings[] em "warning"; errors[] em "fail_fast"
+
+    Args:
+        solucao: {variavel: valor} retornado pelo solver
+        modo: "warning" | "fail_fast"
 
     Returns:
-        lista de {'variavel', 'tipo', 'valor', 'mensagem'}
+        ValidationResult — {valid, warnings, errors, violations}
+        valid=False quando errors não vazio.
     """
-    warnings: list[dict] = []
+    warnings_list: list[dict] = []
+    errors_list:   list[dict] = []
+
     for var, val in solucao.items():
         if not isinstance(val, (int, float)):
             continue
-        restricao = _RESTRICOES.get(var)
-        if restricao is None or restricao[0] is None:
+        regra = _REGRAS_ECONOMICAS.get(var)
+        if regra is None or regra['min'] is None:
             continue
-        minimo, mensagem = restricao
-        if val < minimo:
-            warnings.append({
-                'variavel': var,
-                'tipo': 'violacao_economica',
-                'gravidade': _GRAVIDADE.get(var, 'media'),
-                'valor': round(float(val), 6),
-                'mensagem': mensagem,
-            })
-    return warnings
+        if val < regra['min']:
+            is_blocking = regra['bloqueante_sempre'] or (modo == "fail_fast")
+            item = {
+                'variavel':  var,
+                'tipo':      'violacao_economica',
+                'gravidade': regra['gravidade'],
+                'valor':     round(float(val), 6),
+                'mensagem':  regra['mensagem'],
+                'bloqueante': is_blocking,
+            }
+            if is_blocking:
+                errors_list.append(item)
+            else:
+                warnings_list.append(item)
+
+    all_violations = errors_list + warnings_list
+    return {
+        'valid':      len(errors_list) == 0,
+        'warnings':   warnings_list,
+        'errors':     errors_list,
+        'violations': all_violations,
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  4. SOLUTION VALIDATION LAYER
+#  4. STRUCTURAL CONSISTENCY LAYER
+# ─────────────────────────────────────────────────────────────────────────────
+
+def validar_consistencia_estrutural(solucao: dict) -> list[dict]:
+    """
+    Verifica identidades contábeis conhecidas.
+
+    Tolerância: _EPSILON = 1e-6.
+    Só verifica quando TODAS as variáveis da identidade estão na solução.
+
+    Returns:
+        lista de {'identidade', 'lhs', 'rhs', 'diff', 'mensagem'}
+    """
+    erros: list[dict] = []
+    vals = {k: float(v) for k, v in solucao.items() if isinstance(v, (int, float))}
+
+    # Y = C + I + G  (demanda agregada fechada)
+    if all(k in vals for k in ('Y', 'C', 'I', 'G')):
+        esperado = vals['C'] + vals['I'] + vals['G']
+        diff = abs(vals['Y'] - esperado)
+        if diff > _EPSILON:
+            erros.append({
+                'identidade': 'Y = C + I + G',
+                'lhs':        round(vals['Y'], 6),
+                'rhs':        round(esperado, 6),
+                'diff':       round(diff, 9),
+                'mensagem':   f"Y({vals['Y']:.4g}) ≠ C+I+G({esperado:.4g}), diff={diff:.2e}",
+            })
+
+    # Qd = Qs  (equilíbrio microeconômico)
+    if all(k in vals for k in ('Qd', 'Qs')):
+        diff = abs(vals['Qd'] - vals['Qs'])
+        if diff > _EPSILON:
+            erros.append({
+                'identidade': 'Qd = Qs',
+                'lhs':        round(vals['Qd'], 6),
+                'rhs':        round(vals['Qs'], 6),
+                'diff':       round(diff, 9),
+                'mensagem':   f"Qd({vals['Qd']:.4g}) ≠ Qs({vals['Qs']:.4g}), diff={diff:.2e}",
+            })
+
+    # Md = Ms  (equilíbrio monetário)
+    if all(k in vals for k in ('Md', 'Ms')):
+        diff = abs(vals['Md'] - vals['Ms'])
+        if diff > _EPSILON:
+            erros.append({
+                'identidade': 'Md = Ms',
+                'lhs':        round(vals['Md'], 6),
+                'rhs':        round(vals['Ms'], 6),
+                'diff':       round(diff, 9),
+                'mensagem':   f"Md({vals['Md']:.4g}) ≠ Ms({vals['Ms']:.4g}), diff={diff:.2e}",
+            })
+
+    return erros
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  5. SOLUTION VALIDATION LAYER (per-equation)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def validar_solucao(equacoes: list, solucao: dict) -> list[str]:
     """
-    Recalcula cada equação com a solução encontrada e verifica consistência.
+    Recalcula cada equação com a solução e verifica consistência numérica.
     Ignora equações com símbolos livres (solução simbólica parcial).
 
     Tolerância: 1e-6.
 
     Returns:
-        lista de strings descrevendo inconsistências (vazia = tudo ok).
+        lista de strings descrevendo inconsistências.
     """
     from services.motor_sistemas import _split_equacao
 
@@ -183,14 +287,14 @@ def validar_solucao(equacoes: list, solucao: dict) -> list[str]:
             lhs_val = float(sp.sympify(lhs).subs(subs).evalf())
             rhs_val = float(sp.sympify(rhs).subs(subs).evalf())
             diff = abs(lhs_val - rhs_val)
-            if diff > 1e-6:
+            if diff > _EPSILON:
                 erros.append(
                     f"'{lhs} = {rhs}': "
                     f"LHS={lhs_val:.6g}, RHS={rhs_val:.6g} "
                     f"(diff={diff:.2e})"
                 )
         except Exception:
-            pass  # Equação ainda tem símbolos livres — pula
+            pass  # equação ainda tem símbolos livres — pula
 
     return erros
 
@@ -208,26 +312,12 @@ def simular_cenario(
     Executa cenário base + variações e retorna resultados comparativos.
 
     Args:
-        resolver_fn  : callable(params: dict) → dict[str, float | str]
-                       — recebe parâmetros e retorna solução numérica
+        resolver_fn    : callable(params: dict) → dict[str, float | str]
         parametros_base: {'param': valor} do cenário base
-        variacoes    : [{'nome': str, 'param': str, 'valor': float}, ...]
-                       — cada entrada define uma variação de um único parâmetro
+        variacoes      : [{'nome': str, 'param': str, 'valor': float}, ...]
 
     Returns:
-        {
-            'base'    : {'param1': v1, ...},  # solução do cenário base
-            'cenarios': [
-                {
-                    'nome'            : str,
-                    'parametro_variado': str,
-                    'valor'           : float,
-                    'solucao'         : dict,
-                    'delta_vs_base'   : dict,  # diferença em relação ao base
-                },
-                ...
-            ]
-        }
+        {'base': {valores_base}, 'cenarios': [{nome, parametro_variado, valor, solucao, delta_vs_base}]}
     """
     base = resolver_fn(parametros_base)
     cenarios: list[dict] = []
@@ -245,57 +335,66 @@ def simular_cenario(
         }
 
         cenarios.append({
-            'nome': var.get('nome') or f"{var['param']}={var['valor']}",
+            'nome':              var.get('nome') or f"{var['param']}={var['valor']}",
             'parametro_variado': var['param'],
-            'valor': var['valor'],
-            'solucao': sol,
-            'delta_vs_base': delta,
+            'valor':             var['valor'],
+            'solucao':           sol,
+            'delta_vs_base':     delta,
         })
 
     return {'base': base, 'cenarios': cenarios}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  PONTO ÚNICO DE ENTRADA PARA VALIDAÇÃO ECONÔMICA NO PIPELINE
+#  PONTO ÚNICO DE ENTRADA — HARD GATE DO PIPELINE
 # ─────────────────────────────────────────────────────────────────────────────
 
 class EconomicValidationError(Exception):
-    """Lançada em modo fail_fast quando a solução viola restrições econômicas."""
+    """
+    Lançada em modo fail_fast quando a solução tem errors (violações bloqueantes).
+    Carrega o ValidationResult completo para o endpoint formatar a resposta.
+    """
 
-    def __init__(self, violations: list[dict]):
-        self.violations = violations
-        msgs = "; ".join(v["mensagem"] for v in violations)
+    def __init__(self, result: dict):
+        self.result: dict = result  # ValidationResult
+        msgs = "; ".join(v["mensagem"] for v in result["errors"])
         super().__init__(f"Violação de restrição econômica: {msgs}")
 
 
 def aplicar_validacao_economica(
     solucao: dict,
     modo: str | None = None,
-) -> list[dict]:
+) -> dict:
     """
-    Ponto único e não-bypassável de validação econômica.
+    Hard gate obrigatório do pipeline econômico.
 
-    Respeita ECONOMIC_VALIDATION_ENABLED e ECONOMIC_VALIDATION_MODE de
-    services.config — altere lá para mudar o comportamento global.
+    Fluxo garantido:
+        Solver → aplicar_validacao_economica → Formatter → Response
+
+    Regras:
+    - Não pode ser ignorado (ECONOMIC_VALIDATION_ENABLED=False é o único bypass)
+    - Em "warning": retorna ValidationResult; valid=False é informacional
+    - Em "fail_fast": lança EconomicValidationError se valid=False,
+      impedindo o endpoint de retornar valores da solução
 
     Args:
-        solucao: dicionário {variavel: valor} retornado pelo solver
+        solucao: {variavel: valor} do solver
         modo: sobrescreve ECONOMIC_VALIDATION_MODE se fornecido
 
     Returns:
-        lista de warnings (vazia se sem violações ou validação desativada)
+        ValidationResult — {valid, warnings, errors, violations}
 
     Raises:
-        EconomicValidationError: em modo "fail_fast" quando há violações
+        EconomicValidationError: em fail_fast com valid=False
     """
     from services.config import ECONOMIC_VALIDATION_ENABLED, ECONOMIC_VALIDATION_MODE
     if not ECONOMIC_VALIDATION_ENABLED:
-        return []
+        return {'valid': True, 'warnings': [], 'errors': [], 'violations': []}
 
     modo_efetivo = modo if modo is not None else ECONOMIC_VALIDATION_MODE
-    violations = validar_restricoes_economicas(solucao)
+    result = validar_restricoes_economicas(solucao, modo_efetivo)
 
-    if violations and modo_efetivo == "fail_fast":
-        raise EconomicValidationError(violations)
+    if not result['valid'] and modo_efetivo == "fail_fast":
+        raise EconomicValidationError(result)
 
-    return violations
+    return result

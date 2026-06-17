@@ -21,6 +21,7 @@ from services.motor_sistemas import resolve_sistema as _resolver_sistema, _split
 from services.validador import (
     classificar_variaveis,
     validar_solucao,
+    validar_consistencia_estrutural,
     simular_cenario as _simular_cenario,
     EconomicValidationError,
     aplicar_validacao_economica,
@@ -292,16 +293,32 @@ def resolver_modelo(modelo: ModeloInput) -> dict:
             except Exception:
                 latex_map[f"sol_{var}"] = f"{var} = {str(expr)}"
 
-    # ── ETAPA 6: VALIDAÇÃO DA SOLUÇÃO ────────────────────────────────────────
-    erros_consist = validar_solucao(equacoes_unicas, valores)
+    # ── ETAPA 6: VALIDAÇÃO DA SOLUÇÃO (per-equation + structural) ────────────
+    erros_consist      = validar_solucao(equacoes_unicas, valores)
+    consist_estrutural = validar_consistencia_estrutural(valores)
 
-    # ── ETAPA 7: VALIDAÇÃO ECONÔMICA (obrigatória, não bypassável) ───────────
-    # Em modo "warning": nunca bloqueia. Em modo "fail_fast": adiciona a erros.
+    # ── ETAPA 7: VALIDAÇÃO ECONÔMICA — HARD GATE (não bypassável) ────────────
+    # "warning" → retorna ValidationResult, nunca bloqueia execução
+    # "fail_fast" → lança EconomicValidationError se valid=False:
+    #               endpoint retorna invalid_solution SEM valores numéricos
     try:
-        warnings_econ = aplicar_validacao_economica(valores)
+        validation = aplicar_validacao_economica(valores)
     except EconomicValidationError as exc:
-        erros += [v["mensagem"] for v in exc.violations]
-        warnings_econ = exc.violations
+        return {
+            "status":     "invalid_solution",
+            "errors":     [v["mensagem"] for v in exc.result["errors"]],
+            "violations": exc.result["violations"],
+            "economia": {
+                "valid":                  False,
+                "warnings":               exc.result["warnings"],
+                "errors":                 exc.result["errors"],
+                "violations":             exc.result["violations"],
+                "restricoes":             RESTRICOES_PADRAO,
+                "consistencia":           erros_consist,
+                "consistencia_estrutural": consist_estrutural,
+                "interpretacao":          [],
+            },
+        }
 
     # ---- OBJ 5: elasticidades / derivadas analiticas ----
     # para cada endogena resolvida simbolicamente, dEndogena/dParametro
@@ -373,10 +390,14 @@ def resolver_modelo(modelo: ModeloInput) -> dict:
         },
         # ── Bloco 3: Interpretação econômica ──────────────────────────────────
         "economia": {
-            "interpretacao": sorted(set(dependencias)),
-            "restricoes": RESTRICOES_PADRAO,
-            "warnings": warnings_econ,
-            "consistencia": erros_consist,
+            "valid":                   validation["valid"],
+            "interpretacao":           sorted(set(dependencias)),
+            "restricoes":              RESTRICOES_PADRAO,
+            "warnings":                validation["warnings"],
+            "errors":                  validation["errors"],
+            "violations":              validation["violations"],
+            "consistencia":            erros_consist,
+            "consistencia_estrutural": consist_estrutural,
         },
     }
 
