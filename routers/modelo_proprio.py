@@ -20,9 +20,10 @@ import numpy as np
 from services.motor_sistemas import resolve_sistema as _resolver_sistema, _split_equacao
 from services.validador import (
     classificar_variaveis,
-    validar_restricoes_economicas,
     validar_solucao,
     simular_cenario as _simular_cenario,
+    EconomicValidationError,
+    aplicar_validacao_economica,
     RESTRICOES_PADRAO,
 )
 
@@ -294,8 +295,13 @@ def resolver_modelo(modelo: ModeloInput) -> dict:
     # ── ETAPA 6: VALIDAÇÃO DA SOLUÇÃO ────────────────────────────────────────
     erros_consist = validar_solucao(equacoes_unicas, valores)
 
-    # ── ETAPA 7: VALIDAÇÃO ECONÔMICA ─────────────────────────────────────────
-    warnings_econ = validar_restricoes_economicas(valores)
+    # ── ETAPA 7: VALIDAÇÃO ECONÔMICA (obrigatória, não bypassável) ───────────
+    # Em modo "warning": nunca bloqueia. Em modo "fail_fast": adiciona a erros.
+    try:
+        warnings_econ = aplicar_validacao_economica(valores)
+    except EconomicValidationError as exc:
+        erros += [v["mensagem"] for v in exc.violations]
+        warnings_econ = exc.violations
 
     # ---- OBJ 5: elasticidades / derivadas analiticas ----
     # para cada endogena resolvida simbolicamente, dEndogena/dParametro

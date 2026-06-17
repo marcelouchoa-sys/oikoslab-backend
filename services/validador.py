@@ -10,6 +10,14 @@ import sympy as sp
 #  RESTRIÇÕES ECONÔMICAS
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Gravidade da violação por variável (usada no campo warnings.gravidade)
+_GRAVIDADE: dict[str, str] = {
+    'r': 'alta',   'i': 'alta',  'Y': 'alta',  'P': 'alta',
+    'C': 'media',  'I': 'media', 'Qd': 'media','Qs': 'media',
+    'W': 'media',  'L': 'media', 'kstar': 'media',
+    'G': 'baixa',
+}
+
 # variável → (mínimo_aceitável, mensagem_de_violação)
 # None como mínimo = sem restrição (ex: inflação pode ser negativa)
 _RESTRICOES: dict[str, tuple[float | None, str]] = {
@@ -139,6 +147,7 @@ def validar_restricoes_economicas(solucao: dict) -> list[dict]:
             warnings.append({
                 'variavel': var,
                 'tipo': 'violacao_economica',
+                'gravidade': _GRAVIDADE.get(var, 'media'),
                 'valor': round(float(val), 6),
                 'mensagem': mensagem,
             })
@@ -244,3 +253,49 @@ def simular_cenario(
         })
 
     return {'base': base, 'cenarios': cenarios}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  PONTO ÚNICO DE ENTRADA PARA VALIDAÇÃO ECONÔMICA NO PIPELINE
+# ─────────────────────────────────────────────────────────────────────────────
+
+class EconomicValidationError(Exception):
+    """Lançada em modo fail_fast quando a solução viola restrições econômicas."""
+
+    def __init__(self, violations: list[dict]):
+        self.violations = violations
+        msgs = "; ".join(v["mensagem"] for v in violations)
+        super().__init__(f"Violação de restrição econômica: {msgs}")
+
+
+def aplicar_validacao_economica(
+    solucao: dict,
+    modo: str | None = None,
+) -> list[dict]:
+    """
+    Ponto único e não-bypassável de validação econômica.
+
+    Respeita ECONOMIC_VALIDATION_ENABLED e ECONOMIC_VALIDATION_MODE de
+    services.config — altere lá para mudar o comportamento global.
+
+    Args:
+        solucao: dicionário {variavel: valor} retornado pelo solver
+        modo: sobrescreve ECONOMIC_VALIDATION_MODE se fornecido
+
+    Returns:
+        lista de warnings (vazia se sem violações ou validação desativada)
+
+    Raises:
+        EconomicValidationError: em modo "fail_fast" quando há violações
+    """
+    from services.config import ECONOMIC_VALIDATION_ENABLED, ECONOMIC_VALIDATION_MODE
+    if not ECONOMIC_VALIDATION_ENABLED:
+        return []
+
+    modo_efetivo = modo if modo is not None else ECONOMIC_VALIDATION_MODE
+    violations = validar_restricoes_economicas(solucao)
+
+    if violations and modo_efetivo == "fail_fast":
+        raise EconomicValidationError(violations)
+
+    return violations
