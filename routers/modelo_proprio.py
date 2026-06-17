@@ -18,6 +18,14 @@ import sympy as sp
 import numpy as np
 
 from services.motor_sistemas import resolve_sistema as _resolver_sistema, _split_equacao
+from services.validador import (
+    classificar_variaveis,
+    normalizar_sistema,
+    validar_restricoes_economicas,
+    validar_solucao,
+    simular_cenario as _simular_cenario,
+    RESTRICOES_PADRAO,
+)
 
 router = APIRouter()
 
@@ -51,6 +59,18 @@ class ModeloInput(BaseModel):
     variavel_livre: VariavelLivre | None = None
     # sensibilidade pode variar PARAMETROS (nao so a variavel livre)
     sensibilidades: list[VariavelLivre] = []
+
+
+class VariacaoInput(BaseModel):
+    nome:  str = ""
+    param: str
+    valor: float
+
+
+class CenarioInput(BaseModel):
+    equacoes:        list[Equacao]
+    parametros_base: dict[str, float]
+    variacoes:       list[VariacaoInput]
 
 
 # =============================================================
@@ -258,6 +278,14 @@ def resolver_modelo(modelo: ModeloInput) -> dict:
             except Exception:
                 latex_map[f"sol_{var}"] = f"{var} = {str(expr)}"
 
+    # ---- CAMADAS DE VALIDAÇÃO -----------------------------------------------
+    equacoes_norm     = normalizar_sistema(modelo.equacoes)
+    classificacao     = classificar_variaveis(modelo.equacoes, valores_param)
+    warnings_econ     = validar_restricoes_economicas(valores)
+    erros_consist     = validar_solucao(modelo.equacoes, valores)
+    sol_simbolica_str = {str(k): str(v) for k, v in sol_sym.items()} if sol_sym else {}
+    # -------------------------------------------------------------------------
+
     # ---- OBJ 5: elasticidades / derivadas analiticas ----
     # para cada endogena resolvida simbolicamente, dEndogena/dParametro
     if sol_sym:
@@ -306,7 +334,8 @@ def resolver_modelo(modelo: ModeloInput) -> dict:
                 series[f"{alvo}_vs_{sl.nome}"] = serie
 
     return {
-        "status": "ok" if not erros else "parcial",
+        # ── Campos legados (compatibilidade com frontend) ─────────────────────
+        "status": "ok" if not (erros or warnings_econ) else "parcial",
         "valores": valores,
         "endogenas": sorted(endogenas),
         "parametros_detectados": sorted(param_detectados),
@@ -315,7 +344,51 @@ def resolver_modelo(modelo: ModeloInput) -> dict:
         "latex": latex_map,
         "dependencias": sorted(set(dependencias)),
         "elasticidades": elasticidades,
+        # ── Bloco 1: Matemática ───────────────────────────────────────────────
+        "matematica": {
+            "equacoes_normalizadas": equacoes_norm,
+            "variaveis": classificacao,
+        },
+        # ── Bloco 2: Solução estruturada ──────────────────────────────────────
+        "solucao": {
+            "numerica": valores,
+            "simbolica": sol_simbolica_str,
+        },
+        # ── Bloco 3: Interpretação econômica ──────────────────────────────────
+        "economia": {
+            "interpretacao": sorted(set(dependencias)),
+            "restricoes": RESTRICOES_PADRAO,
+            "warnings": warnings_econ,
+            "consistencia": erros_consist,
+        },
     }
+
+
+@router.post("/simular-cenario")
+def simular_cenarios(payload: CenarioInput) -> dict:
+    """
+    Executa cenário base + variações e retorna comparativo.
+
+    Body:
+        equacoes       : lista de equações do modelo
+        parametros_base: valores dos parâmetros no cenário base
+        variacoes      : [{'nome': str, 'param': str, 'valor': float}]
+
+    Returns:
+        {'base': {valores}, 'cenarios': [{nome, param, valor, solucao, delta}]}
+    """
+    def _resolve(params: dict) -> dict:
+        endogenas, _, todos = _detectar(payload.equacoes, set(params.keys()))
+        endogenas_lhs = set(endogenas)
+        param_detectados = todos - endogenas
+        faltando = param_detectados - set(params.keys())
+        if faltando:
+            endogenas |= faltando
+        endogenas_ordered = sorted(endogenas_lhs) + sorted(faltando)
+        sol_num, _, _ = _resolver_sistema(payload.equacoes, params, endogenas_ordered)
+        return {k: v for k, v in sol_num.items() if isinstance(v, (int, float))}
+
+    return _simular_cenario(_resolve, payload.parametros_base, [v.model_dump() for v in payload.variacoes])
 
 
 @router.post("/validar")
