@@ -17,7 +17,7 @@ def _split_equacao(eq) -> tuple[str, str]:
     return eq.variavel.strip(), expr
 
 
-def resolve_sistema(
+def _resolve_sistema(
     equacoes: list,
     valores_param: dict,
     endogenas,

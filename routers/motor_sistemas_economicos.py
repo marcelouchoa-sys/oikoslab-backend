@@ -3,15 +3,15 @@
 Motor de resolução de sistemas econômicos simbólicos.
 
 Recebe expressões SymPy nativas e retorna soluções estruturadas.
-Para equação única, delega para services.motor_sistemas.resolve_sistema
-sem duplicar a lógica de resolução escalar.
+Toda resolução passa por EconomyEngine — único ponto de entrada do pipeline.
 """
 
 import sympy as sp
 from typing import Optional
 
 from routers.modelo_proprio import Equacao as _MPEquacao
-from services.motor_sistemas import resolve_sistema as _mp_resolve
+from services.economy_engine import EconomyEngine
+from services.validador import EconomicValidationError
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -26,16 +26,8 @@ def _to_equacao(expr: sp.Basic) -> _MPEquacao:
     return _MPEquacao(expressao=f"0 = {expr}")
 
 
-def _to_float(val: sp.Basic) -> float | sp.Basic:
-    """Converte para float quando possível; retorna simbólico caso contrário."""
-    try:
-        return float(val.evalf())
-    except Exception:
-        return val
-
-
 # ─────────────────────────────────────────────────────────────────────────────
-#  DETECÇÃO DE VARIÁVEIS
+#  DETECÇÃO DE VARIÁVEIS (auxiliar para metadados do output)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _detectar_variaveis(
@@ -43,12 +35,7 @@ def _detectar_variaveis(
     variaveis: Optional[list[sp.Symbol]],
     contexto: Optional[dict],
 ) -> tuple[list[sp.Symbol], list[sp.Symbol]]:
-    """
-    Classifica símbolos livres em endógenos (a resolver) e exógenos (parâmetros).
-
-    Regra: símbolo exógeno = presente no contexto.
-    Se variaveis for fornecido explicitamente, usa como endógenas sem inferência.
-    """
+    """Classifica símbolos em endógenos e exógenos para metadados do output."""
     todos: set[sp.Symbol] = set()
     for eq in equacoes:
         todos |= eq.free_symbols
@@ -66,7 +53,7 @@ def _detectar_variaveis(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  FUNÇÃO PRINCIPAL
+#  FUNÇÃO PRINCIPAL — delega ao EconomyEngine
 # ─────────────────────────────────────────────────────────────────────────────
 
 def resolve_sistema(
@@ -75,7 +62,7 @@ def resolve_sistema(
     contexto: Optional[dict] = None,
 ) -> dict:
     """
-    Resolve sistema de equações econômicas simbólicas.
+    Resolve sistema de equações econômicas simbólicas via EconomyEngine.
 
     Args:
         equacoes : lista de sp.Eq ou expressões SymPy (implicitamente == 0).
@@ -84,11 +71,12 @@ def resolve_sistema(
 
     Returns:
         {
-            "solucao"  : dict (solução única) | list[dict] (soluções múltiplas),
+            "solucao"  : dict — solução numérica,
             "endogenas": list[str],
             "exogenas" : list[str],
             "tipo"     : "sistema" | "equacao_unica",
             "erros"    : list[str],
+            "economia" : ValidationResult,
         }
     """
     if not equacoes:
@@ -101,57 +89,19 @@ def resolve_sistema(
         }
 
     endogenas, exogenas = _detectar_variaveis(equacoes, variaveis, contexto)
+    eq_objects = [_to_equacao(eq) for eq in equacoes]
+    parametros = {str(k): float(v) for k, v in (contexto or {}).items()}
+    tipo = "equacao_unica" if len(equacoes) == 1 else "sistema"
 
-    # ── FALLBACK: equação única → delega para modelo_proprio ─────────────────
-    if len(equacoes) == 1:
-        eq = _to_equacao(equacoes[0])
-        valores_param = {str(k): float(v) for k, v in (contexto or {}).items()}
-        endogenas_nomes = {str(s) for s in endogenas}
-
-        sol_num, _sol_sym, erros = _mp_resolve([eq], valores_param, endogenas_nomes)
-
-        return {
-            "solucao": sol_num,
-            "endogenas": [str(s) for s in endogenas],
-            "exogenas": [str(s) for s in exogenas],
-            "tipo": "equacao_unica",
-            "erros": erros,
-        }
-
-    # ── SISTEMA: resolução direta via sp.solve ────────────────────────────────
-    param_subs: dict[sp.Symbol, float] = {
-        sp.Symbol(str(k)): float(v)
-        for k, v in (contexto or {}).items()
-    }
-
-    sistema = [eq.subs(param_subs) if param_subs else eq for eq in equacoes]
-
-    solucao: dict | list = {}
-    erros: list[str] = []
-
-    try:
-        resultado = sp.solve(sistema, endogenas, dict=True)
-        if not resultado:
-            erros.append("Sistema sem solução ou subdeterminado.")
-        elif len(resultado) == 1:
-            solucao = {str(k): _to_float(v) for k, v in resultado[0].items()}
-        else:
-            # Múltiplas soluções (ex: sistemas não-lineares)
-            solucao = [
-                {str(k): _to_float(v) for k, v in sol.items()}
-                for sol in resultado
-            ]
-    except NotImplementedError:
-        erros.append("SymPy não consegue resolver este sistema analiticamente.")
-    except Exception as e:
-        erros.append(f"Erro ao resolver sistema: {e}")
+    result = EconomyEngine.run(eq_objects, parametros)
 
     return {
-        "solucao": solucao,
+        "solucao":   result.get("valores", {}),
         "endogenas": [str(s) for s in endogenas],
-        "exogenas": [str(s) for s in exogenas],
-        "tipo": "sistema",
-        "erros": erros,
+        "exogenas":  [str(s) for s in exogenas],
+        "tipo":      tipo,
+        "erros":     result.get("erros", []),
+        "economia":  result.get("economia", {}),
     }
 
 
@@ -177,12 +127,10 @@ if __name__ == "__main__":
         ]),
     )
 
-    # Caso 2: equação única → fallback modelo_proprio
-    # Cruz Keynesiana: Y = c*(Y-T) + Inv + G  →  Y(1-c) = Inv + G - c*T
-    # Nota: evitar "I" como nome — SymPy reserva I para unidade imaginária
+    # Caso 2: equação única
     Y, c, Inv, G, T = sp.symbols("Y c Inv G T")
     _print(
-        "Equacao unica (fallback modelo_proprio, Y=1400)",
+        "Equacao unica (Y=1400)",
         resolve_sistema(
             [sp.Eq(Y, c * (Y - T) + Inv + G)],
             contexto={"c": 0.75, "Inv": 200, "G": 300, "T": 200},
@@ -190,8 +138,6 @@ if __name__ == "__main__":
     )
 
     # Caso 3: IS-LM simplificado (2 equações, 2 incógnitas)
-    # IS: Y = 800 - 40r   (demanda agregada sensível ao juro)
-    # LM: Y = 400 + 20r   (equilíbrio no mercado de moeda)
     r2, Y2 = sp.symbols("r Y")
     _print(
         "IS-LM (equilibrio simultaneo)",
@@ -199,20 +145,4 @@ if __name__ == "__main__":
             sp.Eq(Y2, 800 - 40 * r2),
             sp.Eq(Y2, 400 + 20 * r2),
         ]),
-    )
-
-    # Caso 4: IS-LM com parâmetros exógenos via contexto
-    a, b, k, h, M = sp.symbols("a b k h M")
-    r3, Y3 = sp.symbols("r Y")
-    # IS: Y = a - b*r     (a=800, b=40)
-    # LM: k*Y - h*r = M   (k=0.5, h=20, M=100)
-    _print(
-        "IS-LM parametrico (contexto exogeno)",
-        resolve_sistema(
-            [
-                sp.Eq(Y3, a - b * r3),
-                sp.Eq(k * Y3 - h * r3, M),
-            ],
-            contexto={"a": 800, "b": 40, "k": 0.5, "h": 20, "M": 100},
-        ),
     )

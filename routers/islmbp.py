@@ -3,7 +3,30 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 import numpy as np
 
+from services.validador import aplicar_validacao_economica, EconomicValidationError
+
 router = APIRouter()
+
+def _gate(eq: dict) -> tuple[dict, bool]:
+    """Aplica hard gate econômico; retorna (validation, blocked)."""
+    try:
+        return aplicar_validacao_economica(eq), False
+    except EconomicValidationError as exc:
+        return exc.result, True
+
+
+def _invalid_response(result: dict) -> dict:
+    return {
+        "status":     "invalid_solution",
+        "errors":     [v["mensagem"] for v in result["errors"]],
+        "violations": result["violations"],
+        "economia": {
+            "valid":      False,
+            "warnings":   result["warnings"],
+            "errors":     result["errors"],
+            "violations": result["violations"],
+        },
+    }
 
 
 class ParametrosISLM(BaseModel):
@@ -56,12 +79,20 @@ def _resolver(p: ParametrosISLM) -> dict:
 
 @router.post("/equilibrio")
 def calcular_equilibrio(p: ParametrosISLM):
-    return {"status": "ok", "equilibrio": _resolver(p)}
+    eq = _resolver(p)
+    validation, blocked = _gate(eq)
+    if blocked:
+        return _invalid_response(validation)
+    return {"status": "ok", "equilibrio": eq, "economia": validation}
 
 
 @router.post("/curvas")
 def calcular_curvas(p: ParametrosISLM):
-    eq       = _resolver(p)
+    eq = _resolver(p)
+    validation, blocked = _gate(eq)
+    if blocked:
+        return _invalid_response(validation)
+
     Y_center = eq["Y"]
     Y_grid   = np.linspace(max(100, Y_center - 800), Y_center + 800, 200)
 
@@ -74,4 +105,5 @@ def calcular_curvas(p: ParametrosISLM):
         "r_IS":       r_IS,
         "r_LM":       r_LM,
         "equilibrio": eq,
+        "economia":   validation,
     }

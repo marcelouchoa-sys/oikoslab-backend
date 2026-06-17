@@ -14,7 +14,7 @@ from __future__ import annotations
 import sympy as sp
 import numpy as np
 
-from services.motor_sistemas import resolve_sistema as _resolver_sistema, _split_equacao
+from services.motor_sistemas import _resolve_sistema as _resolver_sistema, _split_equacao
 from services.validador import (
     classificar_variaveis,
     validar_solucao,
