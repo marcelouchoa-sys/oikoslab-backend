@@ -366,3 +366,119 @@ class EconomyEngine:
                 "consistencia_estrutural": consist_estrutural,
             },
         }
+
+    # ──────────────────────────────────────────────────────────────────────────
+    #  IS-LM-BP ENTRY POINTS
+    #  Toda computação do modelo IS-LM passa por run() — sem bypass.
+    # ──────────────────────────────────────────────────────────────────────────
+
+    @classmethod
+    def run_islm(cls, config: dict) -> dict:
+        """
+        Modelo IS-LM-BP via equações simbólicas → EconomyEngine.run().
+
+        config: dict com os campos de ParametrosISLM (aberta, kf, c0, c1, ...).
+        Retorna o contrato de run() + chave 'equilibrio' para compatibilidade.
+        """
+        equacoes, parametros = cls._build_islm_equations(config)
+        result = cls.run(equacoes, parametros)
+        if result.get("status") == "invalid_solution":
+            return result
+        vals = result.get("valores", {})
+        return {
+            **result,
+            "equilibrio": {
+                "Y":  vals.get("Y"),
+                "r":  vals.get("r", config.get("r_star", 0.0)),
+                "C":  vals.get("C"),
+                "I":  vals.get("I"),
+                "NX": vals.get("NX", 0.0),
+                "e":  config.get("e", 1.0),
+            },
+        }
+
+    @classmethod
+    def run_islm_curvas(cls, config: dict) -> dict:
+        """IS-LM curves (IS e LM) + equilíbrio. Usa run_islm() internamente."""
+        result = cls.run_islm(config)
+        if result.get("status") == "invalid_solution":
+            return result
+
+        Y_center = (result.get("equilibrio") or {}).get("Y") or 1000.0
+        Y_grid = np.linspace(max(100.0, Y_center - 800), Y_center + 800, 200)
+
+        b  = float(config.get("b",  50))
+        c0 = float(config.get("c0", 100))
+        c1 = float(config.get("c1", 0.75))
+        T  = float(config.get("T",  200))
+        I0 = float(config.get("I0", 200))
+        G  = float(config.get("G",  300))
+        k  = float(config.get("k",  0.5))
+        h  = float(config.get("h",  100))
+        M  = float(config.get("M",  1000))
+        P  = float(config.get("P",  1.0))
+
+        r_IS = [(c0 - c1*T + I0 + G - (1 - c1)*Y) / b for Y in Y_grid]
+        r_LM = [(k*Y - M/P) / h for Y in Y_grid]
+
+        return {
+            **result,
+            "Y_grid": Y_grid.tolist(),
+            "r_IS":   r_IS,
+            "r_LM":   r_LM,
+        }
+
+    @staticmethod
+    def _build_islm_equations(config: dict) -> tuple[list, dict]:
+        """
+        Constrói equações simbólicas do IS-LM-BP.
+
+        Usa SimpleNamespace para evitar import circular com routers.modelo_proprio.
+        _split_equacao aceita qualquer objeto com .expressao e .variavel.
+        """
+        from types import SimpleNamespace
+
+        def _eq(variavel: str = "", expressao: str = "") -> object:
+            return SimpleNamespace(variavel=variavel, expressao=expressao, nome="")
+
+        aberta = bool(config.get("aberta", False))
+        kf     = float(config.get("kf", 0))
+
+        if not aberta:
+            # Economia fechada: IS + LM
+            # Endógenas: C, I, Y, r   |   Parâmetros: c0,c1,T,I0,b,G,M,P,k,h
+            equacoes = [
+                _eq("C",  "c0 + c1*(Y - T)"),
+                _eq("I",  "I0 - b*r"),
+                _eq("Y",  "C + I + G"),
+                _eq("",   "k*Y - h*r = M/P"),   # LM: Md = Ms inline
+            ]
+            chaves = ("c0", "c1", "T", "I0", "b", "G", "M", "P", "k", "h")
+
+        elif kf >= 1e5:
+            # Mobilidade perfeita (Mundell-Fleming): IS + BP (r = r*)
+            # Endógenas: C, I, NX, Y, r
+            equacoes = [
+                _eq("C",  "c0 + c1*(Y - T)"),
+                _eq("I",  "I0 - b*r"),
+                _eq("r",  "r_star"),               # interest parity
+                _eq("NX", "x0 + x1*e - m0 - m1*Y"),
+                _eq("Y",  "C + I + G + NX"),
+            ]
+            chaves = ("c0", "c1", "T", "I0", "b", "G", "r_star", "x0", "x1", "e", "m0", "m1")
+
+        else:
+            # Mobilidade imperfeita: IS + NX + BP (sem LM explícita)
+            # Endógenas: C, I, NX, Y, r
+            equacoes = [
+                _eq("C",  "c0 + c1*(Y - T)"),
+                _eq("I",  "I0 - b*r"),
+                _eq("NX", "x0 + x1*e - m0 - m1*Y"),
+                _eq("Y",  "C + I + G + NX"),
+                _eq("r",  "r_star - NX/kf"),       # BP: balanço de pagamentos
+            ]
+            chaves = ("c0", "c1", "T", "I0", "b", "G", "r_star", "kf",
+                      "x0", "x1", "e", "m0", "m1")
+
+        parametros = {k: float(config[k]) for k in chaves if k in config}
+        return equacoes, parametros
