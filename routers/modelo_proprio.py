@@ -1,65 +1,56 @@
 
 # routers/modelo_proprio.py
 """
-Laboratorio de Modelos Economicos.
-Resolve modelos definidos pelo usuario com algebra simbolica (sympy).
+Adaptador HTTP para o laboratório de modelos econômicos do OikosLab.
 
-Capacidades:
-  1. Deteccao automatica de variaveis endogenas vs parametros
-  2. Resolucao de sistemas de equacoes simultaneas
-  3. Biblioteca de blocos economicos prontos
-  4. Analise de sensibilidade (variar parametro -> ver efeito)
-  5. Elasticidades / derivadas analiticas (dY/dG etc.)
+Responsabilidades deste arquivo:
+  - Definir contratos HTTP (request/response models Pydantic)
+  - Rotear requisições para EconomyEngine (único processador)
+  - Gerir biblioteca de blocos pré-configurados
+
+Toda lógica de resolução, validação e formatação vive em EconomyEngine.
+Nenhuma chamada direta ao solver é feita aqui.
 """
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import sympy as sp
-import numpy as np
 
-from services.motor_sistemas import resolve_sistema as _resolver_sistema, _split_equacao
-from services.validador import (
-    classificar_variaveis,
-    validar_solucao,
-    validar_consistencia_estrutural,
-    simular_cenario as _simular_cenario,
-    EconomicValidationError,
-    aplicar_validacao_economica,
-    RESTRICOES_PADRAO,
-)
+from services.validador import simular_cenario as _simular_cenario
+from services.economy_engine import EconomyEngine
 
 router = APIRouter()
 
 
 # =============================================================
-#  MODELOS DE ENTRADA / SAIDA
+#  MODELOS DE ENTRADA
 # =============================================================
+
 class Parametro(BaseModel):
-    nome:  str
-    valor: float
+    nome:      str
+    valor:     float
     descricao: str = ""
 
 
 class Equacao(BaseModel):
     nome:      str = ""
-    variavel:  str = ""          # opcional: lado esquerdo (ex "C"). Se vazio, inferido.
-    expressao: str               # pode ser "C = a + c*(Y-T)" ou so o lado direito
+    variavel:  str = ""      # lado esquerdo explícito (ex: "C"); inferido se vazio
+    expressao: str           # "C = a + c*(Y-T)"  ou apenas o lado direito
 
 
 class VariavelLivre(BaseModel):
-    nome:   str
-    min:    float = 0
-    max:    float = 2000
-    pontos: int   = 200
-    mostrar: list[str] = []      # quais endogenas plotar (vazio = todas)
+    nome:    str
+    min:     float     = 0
+    max:     float     = 2000
+    pontos:  int       = 200
+    mostrar: list[str] = []  # quais endógenas plotar (vazio = todas)
 
 
 class ModeloInput(BaseModel):
     parametros:     list[Parametro]
     equacoes:       list[Equacao]
-    variavel_livre: VariavelLivre | None = None
-    # sensibilidade pode variar PARAMETROS (nao so a variavel livre)
-    sensibilidades: list[VariavelLivre] = []
+    variavel_livre: VariavelLivre | None  = None
+    sensibilidades: list[VariavelLivre]  = []
 
 
 class VariacaoInput(BaseModel):
@@ -75,51 +66,17 @@ class CenarioInput(BaseModel):
 
 
 # =============================================================
-#  HELPERS
+#  BIBLIOTECA DE BLOCOS ECONÔMICOS
 # =============================================================
-def _detectar(equacoes: list[Equacao], param_nomes: set[str]):
-    """
-    OBJETIVO 1: separa endogenas de parametros.
-    Endogena = qualquer simbolo que aparece no lado ESQUERDO de uma equacao.
-    Parametro = simbolo nas expressoes que nunca e lado esquerdo.
-    Retorna (endogenas:set, lhs_list:list, todos_simbolos:set).
-    """
-    endogenas = set()
-    lhs_list = []
-    todos = set()
 
-    for eq in equacoes:
-        lhs, rhs = _split_equacao(eq)
-        if not lhs or not rhs:
-            continue
-        # o lhs pode ser uma variavel simples (caso padrao)
-        lhs_sym = sp.Symbol(lhs) if lhs.isidentifier() else None
-        if lhs_sym is not None:
-            endogenas.add(lhs)
-        lhs_list.append((lhs, rhs))
-        # coletar simbolos de ambos os lados
-        try:
-            for s in sp.sympify(rhs).free_symbols:
-                todos.add(str(s))
-        except Exception:
-            pass
-        if lhs.isidentifier():
-            todos.add(lhs)
-
-    return endogenas, lhs_list, todos
-
-
-# =============================================================
-#  OBJETIVO 3: BIBLIOTECA DE BLOCOS ECONOMICOS
-# =============================================================
 BLOCOS = {
     "consumo_keynesiano": {
         "nome": "Consumo Keynesiano",
         "equacao": {"variavel": "C", "expressao": "a + c*(Y - T)", "nome": "Consumo"},
         "parametros": [
-            {"nome": "a", "valor": 100, "descricao": "Consumo autonomo"},
+            {"nome": "a", "valor": 100,  "descricao": "Consumo autonomo"},
             {"nome": "c", "valor": 0.75, "descricao": "Propensao marginal a consumir"},
-            {"nome": "T", "valor": 200, "descricao": "Impostos"},
+            {"nome": "T", "valor": 200,  "descricao": "Impostos"},
         ],
     },
     "investimento": {
@@ -131,9 +88,9 @@ BLOCOS = {
         "nome": "Investimento sensivel ao juro",
         "equacao": {"variavel": "I", "expressao": "I0 - b*r", "nome": "Investimento"},
         "parametros": [
-            {"nome": "I0", "valor": 200, "descricao": "Investimento autonomo"},
-            {"nome": "b", "valor": 50, "descricao": "Sensibilidade ao juro"},
-            {"nome": "r", "valor": 0.05, "descricao": "Taxa de juros"},
+            {"nome": "I0", "valor": 200,  "descricao": "Investimento autonomo"},
+            {"nome": "b",  "valor": 50,   "descricao": "Sensibilidade ao juro"},
+            {"nome": "r",  "valor": 0.05, "descricao": "Taxa de juros"},
         ],
     },
     "governo": {
@@ -169,37 +126,46 @@ BLOCOS = {
     },
     "solow_ss": {
         "nome": "Solow (Capital de Estado Estacionario)",
-        "equacao": {"variavel": "kstar", "expressao": "(s/(n+delta))**(1/(1-alpha))", "nome": "Capital por trabalhador (SS)"},
+        "equacao": {
+            "variavel":  "kstar",
+            "expressao": "(s/(n+delta))**(1/(1-alpha))",
+            "nome":      "Capital por trabalhador (SS)",
+        },
         "parametros": [
-            {"nome": "s", "valor": 0.2, "descricao": "Taxa de poupanca"},
-            {"nome": "n", "valor": 0.02, "descricao": "Crescimento populacional"},
-            {"nome": "delta", "valor": 0.1, "descricao": "Depreciacao"},
+            {"nome": "s",     "valor": 0.2,  "descricao": "Taxa de poupanca"},
+            {"nome": "n",     "valor": 0.02, "descricao": "Crescimento populacional"},
+            {"nome": "delta", "valor": 0.1,  "descricao": "Depreciacao"},
             {"nome": "alpha", "valor": 0.33, "descricao": "Participacao do capital"},
         ],
     },
 }
 
-# Modelos completos (conjuntos de blocos)
 MODELOS_PRONTOS = {
     "cruz_keynesiana": {
-        "nome": "Cruz Keynesiana",
+        "nome":    "Cruz Keynesiana",
         "descricao": "Modelo de renda de equilibrio com consumo, investimento e governo.",
-        "blocos": ["consumo_keynesiano", "investimento", "governo", "produto"],
+        "blocos":  ["consumo_keynesiano", "investimento", "governo", "produto"],
     },
     "economia_aberta": {
-        "nome": "Economia Aberta",
+        "nome":    "Economia Aberta",
         "descricao": "Cruz keynesiana com setor externo (exportacoes liquidas).",
-        "blocos": ["consumo_keynesiano", "investimento", "governo", "exportacoes_liquidas", "produto_aberto"],
+        "blocos":  ["consumo_keynesiano", "investimento", "governo", "exportacoes_liquidas", "produto_aberto"],
     },
 }
 
 
+# =============================================================
+#  ENDPOINTS DE CONSULTA (biblioteca)
+# =============================================================
+
 @router.get("/blocos")
 def listar_blocos():
     return {
-        "blocos": [{"id": k, "nome": v["nome"]} for k, v in BLOCOS.items()],
-        "modelos": [{"id": k, "nome": v["nome"], "descricao": v["descricao"], "blocos": v["blocos"]}
-                    for k, v in MODELOS_PRONTOS.items()],
+        "blocos":  [{"id": k, "nome": v["nome"]} for k, v in BLOCOS.items()],
+        "modelos": [
+            {"id": k, "nome": v["nome"], "descricao": v["descricao"], "blocos": v["blocos"]}
+            for k, v in MODELOS_PRONTOS.items()
+        ],
     }
 
 
@@ -222,185 +188,31 @@ def obter_modelo_pronto(modelo_id: str):
         equacoes.append(b["equacao"])
         for p in b["parametros"]:
             if p["nome"] not in vistos:
-                parametros.append(p); vistos.add(p["nome"])
+                parametros.append(p)
+                vistos.add(p["nome"])
     return {"nome": m["nome"], "descricao": m["descricao"],
             "equacoes": equacoes, "parametros": parametros}
 
 
 # =============================================================
 #  ENDPOINT PRINCIPAL: RESOLVER
+#  Todo o pipeline passa por EconomyEngine.run() — sem bypass.
 # =============================================================
+
 @router.post("/resolver")
 def resolver_modelo(modelo: ModeloInput) -> dict:
-    erros: list[str] = []
-    valores: dict[str, float] = {}
-    series = None
-    latex_map: dict[str, str] = {}
-    dependencias: list[str] = []
-    elasticidades: dict[str, dict] = {}
+    return EconomyEngine.run(
+        equacoes=modelo.equacoes,
+        parametros={p.nome: p.valor for p in modelo.parametros},
+        variavel_livre=modelo.variavel_livre,
+        sensibilidades=modelo.sensibilidades,
+    )
 
-    valores_param = {p.nome: p.valor for p in modelo.parametros}
-    param_nomes = set(valores_param.keys())
 
-    # ── ETAPA 1: NORMALIZAÇÃO (antes de qualquer outro processamento) ────────
-    # Deduplicar preservando objetos Equacao originais (não apenas strings)
-    _vistas_canon: set[str] = set()
-    equacoes_unicas: list[Equacao] = []
-    for _eq in modelo.equacoes:
-        _lhs, _rhs = _split_equacao(_eq)
-        if not _lhs or not _rhs:
-            continue
-        try:
-            _canon = str(sp.expand(sp.sympify(_lhs) - sp.sympify(_rhs)))
-        except Exception:
-            _canon = f"{_lhs}={_rhs}"
-        if _canon not in _vistas_canon:
-            _vistas_canon.add(_canon)
-            equacoes_unicas.append(_eq)
-    equacoes_norm = [f"{_split_equacao(e)[0].strip()} = {_split_equacao(e)[1].strip()}" for e in equacoes_unicas]
-
-    # ── ETAPA 2: CLASSIFICAÇÃO DE VARIÁVEIS ──────────────────────────────────
-    classificacao = classificar_variaveis(equacoes_unicas, valores_param)
-
-    # ── ETAPA 3: LaTeX das equações de entrada ────────────────────────────────
-    for eq in equacoes_unicas:
-        lhs, rhs = _split_equacao(eq)
-        try:
-            latex_map[lhs or eq.nome] = f"{lhs} = {sp.latex(sp.sympify(rhs))}"
-        except Exception:
-            latex_map[lhs or eq.nome] = f"{lhs} = {rhs}"
-
-    # ── ETAPA 4: DETECÇÃO DE ENDÓGENAS ───────────────────────────────────────
-    endogenas, _, todos = _detectar(equacoes_unicas, param_nomes)
-    endogenas_lhs = set(endogenas)
-    param_detectados = todos - endogenas
-    faltando = param_detectados - param_nomes
-    if faltando:
-        endogenas |= faltando
-        param_detectados = todos - endogenas
-    endogenas_ordered = sorted(endogenas_lhs) + sorted(faltando)
-
-    # ── ETAPA 5: RESOLUÇÃO SIMBÓLICA/NUMÉRICA ────────────────────────────────
-    sol_num, sol_sym, errs = _resolver_sistema(equacoes_unicas, valores_param, endogenas_ordered)
-    erros += errs
-    valores = sol_num
-    sol_simbolica_str = {str(k): str(v) for k, v in sol_sym.items()} if sol_sym else {}
-
-    if sol_sym:
-        for var, expr in sol_sym.items():
-            try:
-                latex_map[f"sol_{var}"] = f"{var} = {sp.latex(expr)}"
-            except Exception:
-                latex_map[f"sol_{var}"] = f"{var} = {str(expr)}"
-
-    # ── ETAPA 6: VALIDAÇÃO DA SOLUÇÃO (per-equation + structural) ────────────
-    erros_consist      = validar_solucao(equacoes_unicas, valores)
-    consist_estrutural = validar_consistencia_estrutural(valores)
-
-    # ── ETAPA 7: VALIDAÇÃO ECONÔMICA — HARD GATE (não bypassável) ────────────
-    # "warning" → retorna ValidationResult, nunca bloqueia execução
-    # "fail_fast" → lança EconomicValidationError se valid=False:
-    #               endpoint retorna invalid_solution SEM valores numéricos
-    try:
-        validation = aplicar_validacao_economica(valores)
-    except EconomicValidationError as exc:
-        return {
-            "status":     "invalid_solution",
-            "errors":     [v["mensagem"] for v in exc.result["errors"]],
-            "violations": exc.result["violations"],
-            "economia": {
-                "valid":                  False,
-                "warnings":               exc.result["warnings"],
-                "errors":                 exc.result["errors"],
-                "violations":             exc.result["violations"],
-                "restricoes":             RESTRICOES_PADRAO,
-                "consistencia":           erros_consist,
-                "consistencia_estrutural": consist_estrutural,
-                "interpretacao":          [],
-            },
-        }
-
-    # ---- OBJ 5: elasticidades / derivadas analiticas ----
-    # para cada endogena resolvida simbolicamente, dEndogena/dParametro
-    if sol_sym:
-        for endog, expr in sol_sym.items():
-            nome_e = str(endog)
-            derivs = {}
-            for pnome in sorted(param_detectados):
-                try:
-                    d = sp.diff(expr, sp.Symbol(pnome))
-                    d_val = float(d.subs({sp.Symbol(k): v for k, v in valores_param.items()}).evalf())
-                    if abs(d_val) > 1e-9:
-                        derivs[pnome] = round(d_val, 4)
-                        # relacao qualitativa
-                        seta = "↑" if d_val > 0 else "↓"
-                        dependencias.append(f"↑ {pnome} → {seta} {nome_e}")
-                except Exception:
-                    pass
-            if derivs:
-                elasticidades[nome_e] = derivs
-
-    # ---- OBJ 4: series (variavel livre OU sensibilidades) ----
-    sensis = list(modelo.sensibilidades)
-    if modelo.variavel_livre:
-        sensis.append(modelo.variavel_livre)
-
-    if sensis and sol_sym:
-        series = {}
-        for sl in sensis:
-            grid = np.linspace(sl.min, sl.max, sl.pontos)
-            chave_x = f"{sl.nome}"
-            series[chave_x] = grid.tolist()
-            # quais endogenas plotar
-            alvos = sl.mostrar or [str(k) for k in sol_sym.keys()]
-            for alvo in alvos:
-                if alvo not in [str(k) for k in sol_sym.keys()]:
-                    continue
-                expr = sol_sym[sp.Symbol(alvo)]
-                serie = []
-                for x in grid:
-                    subs = {sp.Symbol(k): v for k, v in valores_param.items()}
-                    subs[sp.Symbol(sl.nome)] = x  # varia o parametro/variavel
-                    try:
-                        serie.append(float(expr.subs(subs).evalf()))
-                    except Exception:
-                        serie.append(None)
-                series[f"{alvo}_vs_{sl.nome}"] = serie
-
-    return {
-        # ── Campos legados (compatibilidade com frontend) ─────────────────────
-        "status": "ok" if not erros else "parcial",
-        "valores": valores,
-        "endogenas": sorted(endogenas),
-        "parametros_detectados": sorted(param_detectados),
-        "series": series,
-        "erros": erros,
-        "latex": latex_map,
-        "dependencias": sorted(set(dependencias)),
-        "elasticidades": elasticidades,
-        # ── Bloco 1: Matemática ───────────────────────────────────────────────
-        "matematica": {
-            "equacoes_normalizadas": equacoes_norm,
-            "variaveis": classificacao,
-        },
-        # ── Bloco 2: Solução estruturada ──────────────────────────────────────
-        "solucao": {
-            "numerica": valores,
-            "simbolica": sol_simbolica_str,
-        },
-        # ── Bloco 3: Interpretação econômica ──────────────────────────────────
-        "economia": {
-            "valid":                   validation["valid"],
-            "interpretacao":           sorted(set(dependencias)),
-            "restricoes":              RESTRICOES_PADRAO,
-            "warnings":                validation["warnings"],
-            "errors":                  validation["errors"],
-            "violations":              validation["violations"],
-            "consistencia":            erros_consist,
-            "consistencia_estrutural": consist_estrutural,
-        },
-    }
-
+# =============================================================
+#  SIMULAÇÃO DE CENÁRIOS
+#  Usa EconomyEngine.resolve_single() — solver sempre gateado.
+# =============================================================
 
 @router.post("/simular-cenario")
 def simular_cenarios(payload: CenarioInput) -> dict:
@@ -416,18 +228,18 @@ def simular_cenarios(payload: CenarioInput) -> dict:
         {'base': {valores}, 'cenarios': [{nome, param, valor, solucao, delta}]}
     """
     def _resolve(params: dict) -> dict:
-        endogenas, _, todos = _detectar(payload.equacoes, set(params.keys()))
-        endogenas_lhs = set(endogenas)
-        param_detectados = todos - endogenas
-        faltando = param_detectados - set(params.keys())
-        if faltando:
-            endogenas |= faltando
-        endogenas_ordered = sorted(endogenas_lhs) + sorted(faltando)
-        sol_num, _, _ = _resolver_sistema(payload.equacoes, params, endogenas_ordered)
-        return {k: v for k, v in sol_num.items() if isinstance(v, (int, float))}
+        return EconomyEngine.resolve_single(payload.equacoes, params)['valores']
 
-    return _simular_cenario(_resolve, payload.parametros_base, [v.model_dump() for v in payload.variacoes])
+    return _simular_cenario(
+        _resolve,
+        payload.parametros_base,
+        [v.model_dump() for v in payload.variacoes],
+    )
 
+
+# =============================================================
+#  VALIDAÇÃO SINTÁTICA DE EXPRESSÕES
+# =============================================================
 
 @router.post("/validar")
 def validar_expressao(payload: dict) -> dict:
