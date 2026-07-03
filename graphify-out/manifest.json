@@ -1,0 +1,252 @@
+{
+  "oikoslab-platform/backend/main.py": {
+    "mtime": 1781193774.8123214,
+    "ast_hash": "ebcb59199abb850b190181778ea20401",
+    "semantic_hash": "ebcb59199abb850b190181778ea20401"
+  },
+  "oikoslab-platform/backend/routers/__init__.py": {
+    "mtime": 1780945054.089679,
+    "ast_hash": "d6ea7a0c7314224cb142c43d0d2e2b0c",
+    "semantic_hash": "d6ea7a0c7314224cb142c43d0d2e2b0c"
+  },
+  "oikoslab-platform/backend/routers/economia_real.py": {
+    "mtime": 1781184470.454853,
+    "ast_hash": "71c08b8554808d24e3df8b7a1a62ddfc",
+    "semantic_hash": "71c08b8554808d24e3df8b7a1a62ddfc"
+  },
+  "oikoslab-platform/backend/routers/funcoes.py": {
+    "mtime": 1780945089.112487,
+    "ast_hash": "9451f21fc5a442bdba6a6b605c7f7486",
+    "semantic_hash": "9451f21fc5a442bdba6a6b605c7f7486"
+  },
+  "oikoslab-platform/backend/routers/islmbp.py": {
+    "mtime": 1780945067.9597213,
+    "ast_hash": "61e53cd4a241a2423aad4ba8426ca956",
+    "semantic_hash": "61e53cd4a241a2423aad4ba8426ca956"
+  },
+  "oikoslab-platform/backend/routers/modelo_proprio.py": {
+    "mtime": 1781549502.890129,
+    "ast_hash": "8fb8d2500f12886cfe8087c6df253dad",
+    "semantic_hash": "8fb8d2500f12886cfe8087c6df253dad"
+  },
+  "oikoslab-platform/backend/routers/simulador_dinamico.py": {
+    "mtime": 1781533106.3951468,
+    "ast_hash": "058e5a431b670ac40fd9b9726768ac53",
+    "semantic_hash": "058e5a431b670ac40fd9b9726768ac53"
+  },
+  "oikoslab-platform/frontend/.vercel/project.json": {
+    "mtime": 1780943765.067652,
+    "ast_hash": "41d6ec4491d3c0d92541fb9c3e769b08",
+    "semantic_hash": "41d6ec4491d3c0d92541fb9c3e769b08"
+  },
+  "oikoslab-platform/frontend/app/auth/logout/route.ts": {
+    "mtime": 1780770015.9305632,
+    "ast_hash": "9b76b6db1fbe304d779089d8ea22e059",
+    "semantic_hash": "9b76b6db1fbe304d779089d8ea22e059"
+  },
+  "oikoslab-platform/frontend/app/blog/page.tsx": {
+    "mtime": 1781212545.6140049,
+    "ast_hash": "37eddcdda86ca3f994d5ecbad05c2e8f",
+    "semantic_hash": "37eddcdda86ca3f994d5ecbad05c2e8f"
+  },
+  "oikoslab-platform/frontend/app/contato/page.tsx": {
+    "mtime": 1781211477.0400143,
+    "ast_hash": "211460e7828c2a44f7628e72d344e5d8",
+    "semantic_hash": "211460e7828c2a44f7628e72d344e5d8"
+  },
+  "oikoslab-platform/frontend/app/dashboard/page.tsx": {
+    "mtime": 1781404198.7482033,
+    "ast_hash": "7b32bee652e49b2ae7cf9bd1ea92a6b7",
+    "semantic_hash": "7b32bee652e49b2ae7cf9bd1ea92a6b7"
+  },
+  "oikoslab-platform/frontend/app/home/page.tsx": {
+    "mtime": 1781203566.8265142,
+    "ast_hash": "8c5c47e6af4818deb09020cb45949441",
+    "semantic_hash": "8c5c47e6af4818deb09020cb45949441"
+  },
+  "oikoslab-platform/frontend/app/layout.tsx": {
+    "mtime": 1780696809.361021,
+    "ast_hash": "94c34ef68b3949a75807a0211ec2273c",
+    "semantic_hash": "94c34ef68b3949a75807a0211ec2273c"
+  },
+  "oikoslab-platform/frontend/app/login/page.tsx": {
+    "mtime": 1781200109.0038385,
+    "ast_hash": "1dfe1662e6cc5011381e388a98c68d58",
+    "semantic_hash": "1dfe1662e6cc5011381e388a98c68d58"
+  },
+  "oikoslab-platform/frontend/app/page.tsx": {
+    "mtime": 1781198230.0857797,
+    "ast_hash": "b8209c05ab8f36beeefce9c9ef169732",
+    "semantic_hash": "b8209c05ab8f36beeefce9c9ef169732"
+  },
+  "oikoslab-platform/frontend/app/perfil/page.tsx": {
+    "mtime": 1781406229.7025332,
+    "ast_hash": "ccb154e5a8fb31ede80a0fb4b0b1ace8",
+    "semantic_hash": "ccb154e5a8fb31ede80a0fb4b0b1ace8"
+  },
+  "oikoslab-platform/frontend/app/projetos/[id]/construtor/page.tsx": {
+    "mtime": 1781549523.204815,
+    "ast_hash": "012775342685131c3805f4b6fc3877cb",
+    "semantic_hash": "012775342685131c3805f4b6fc3877cb"
+  },
+  "oikoslab-platform/frontend/app/projetos/[id]/economia-real/page.tsx": {
+    "mtime": 1781404580.0861902,
+    "ast_hash": "7effaa4ba019e134622d7231671de108",
+    "semantic_hash": "7effaa4ba019e134622d7231671de108"
+  },
+  "oikoslab-platform/frontend/app/projetos/[id]/editor/page.tsx": {
+    "mtime": 1781182254.503001,
+    "ast_hash": "c03c24d390e781efef4e39aa1f02523c",
+    "semantic_hash": "c03c24d390e781efef4e39aa1f02523c"
+  },
+  "oikoslab-platform/frontend/app/projetos/[id]/editor/visual/page.tsx": {
+    "mtime": 1781181646.2602448,
+    "ast_hash": "a4a7aadbbecd317e33671094c79e27cd",
+    "semantic_hash": "a4a7aadbbecd317e33671094c79e27cd"
+  },
+  "oikoslab-platform/frontend/app/projetos/[id]/page.tsx": {
+    "mtime": 1781277067.8610804,
+    "ast_hash": "d677eb5aeca7a2d6ffa877a5a80b6d26",
+    "semantic_hash": "d677eb5aeca7a2d6ffa877a5a80b6d26"
+  },
+  "oikoslab-platform/frontend/app/projetos/[id]/simulador-dinamico/page.tsx": {
+    "mtime": 1781533125.6085565,
+    "ast_hash": "6314ab4887b24409e5b2ea2a0d36e585",
+    "semantic_hash": "6314ab4887b24409e5b2ea2a0d36e585"
+  },
+  "oikoslab-platform/frontend/app/projetos/novo/page.tsx": {
+    "mtime": 1781274863.15626,
+    "ast_hash": "c3314eaee6fb33b11eb58a37ebba446e",
+    "semantic_hash": "c3314eaee6fb33b11eb58a37ebba446e"
+  },
+  "oikoslab-platform/frontend/app/projetos/page.tsx": {
+    "mtime": 1781213854.0893762,
+    "ast_hash": "20846a9869fb51f0b2fbe0b335c86bdc",
+    "semantic_hash": "20846a9869fb51f0b2fbe0b335c86bdc"
+  },
+  "oikoslab-platform/frontend/app/sobre/page.tsx": {
+    "mtime": 1781211454.8699787,
+    "ast_hash": "6eea200f95d2b1b15df0337ef175428c",
+    "semantic_hash": "6eea200f95d2b1b15df0337ef175428c"
+  },
+  "oikoslab-platform/frontend/components/ui/accordion.tsx": {
+    "mtime": 1781198880.2432692,
+    "ast_hash": "429e97db2d5e796d0fad61d11e893d25",
+    "semantic_hash": "429e97db2d5e796d0fad61d11e893d25"
+  },
+  "oikoslab-platform/frontend/components/ui/button.tsx": {
+    "mtime": 1781198891.112536,
+    "ast_hash": "0bab43a5d6aee4d6e4d8e71c3deb68f1",
+    "semantic_hash": "0bab43a5d6aee4d6e4d8e71c3deb68f1"
+  },
+  "oikoslab-platform/frontend/components/ui/cta-section.tsx": {
+    "mtime": 1781196399.8021867,
+    "ast_hash": "dbca6c2a52cac3b9ed0102a19fffc8ae",
+    "semantic_hash": "dbca6c2a52cac3b9ed0102a19fffc8ae"
+  },
+  "oikoslab-platform/frontend/components/ui/liquid-glass-button.tsx": {
+    "mtime": 1781195699.0485249,
+    "ast_hash": "ce5d667a05c0ceb4bce2cb7debf7fbb1",
+    "semantic_hash": "ce5d667a05c0ceb4bce2cb7debf7fbb1"
+  },
+  "oikoslab-platform/frontend/components/ui/math-editor.tsx": {
+    "mtime": 1781275935.8151255,
+    "ast_hash": "1f793d929e446b3833d170f0dfce182d",
+    "semantic_hash": "1f793d929e446b3833d170f0dfce182d"
+  },
+  "oikoslab-platform/frontend/components/ui/navigation-menu.tsx": {
+    "mtime": 1781198907.2693357,
+    "ast_hash": "4f1ec6fe74de82fe4786fd284a3ea654",
+    "semantic_hash": "4f1ec6fe74de82fe4786fd284a3ea654"
+  },
+  "oikoslab-platform/frontend/components/ui/oikos-navbar.tsx": {
+    "mtime": 1781211436.48219,
+    "ast_hash": "18c599f99dd3d2299df737f6fbc0a78c",
+    "semantic_hash": "18c599f99dd3d2299df737f6fbc0a78c"
+  },
+  "oikoslab-platform/frontend/components/ui/rich-editor.tsx": {
+    "mtime": 1781274551.3285005,
+    "ast_hash": "b366242d41c3ae3fc5e124855e37c916",
+    "semantic_hash": "b366242d41c3ae3fc5e124855e37c916"
+  },
+  "oikoslab-platform/frontend/components/ui/sheet.tsx": {
+    "mtime": 1781198936.311996,
+    "ast_hash": "d7e0360f76cb8b8258687c3e249e7831",
+    "semantic_hash": "d7e0360f76cb8b8258687c3e249e7831"
+  },
+  "oikoslab-platform/frontend/components/ui/web-gl-shader.tsx": {
+    "mtime": 1781195679.0026288,
+    "ast_hash": "194f4e811538036ee4a287350359a1aa",
+    "semantic_hash": "194f4e811538036ee4a287350359a1aa"
+  },
+  "oikoslab-platform/frontend/eslint.config.mjs": {
+    "mtime": 1780696809.2388408,
+    "ast_hash": "dfa1f5f6a7037bf39dc510f30b180002",
+    "semantic_hash": "dfa1f5f6a7037bf39dc510f30b180002"
+  },
+  "oikoslab-platform/frontend/lib/api.ts": {
+    "mtime": 1780945198.817444,
+    "ast_hash": "b249257f30268b3e94d1cf7ef22a63bb",
+    "semantic_hash": "b249257f30268b3e94d1cf7ef22a63bb"
+  },
+  "oikoslab-platform/frontend/lib/supabase-server.ts": {
+    "mtime": 1780770007.0901346,
+    "ast_hash": "06b0a39f34572441f5fbbaa609fe0c80",
+    "semantic_hash": "06b0a39f34572441f5fbbaa609fe0c80"
+  },
+  "oikoslab-platform/frontend/lib/supabase.ts": {
+    "mtime": 1780770005.0746663,
+    "ast_hash": "4cb5739c1e33353d8f9d66c1737df2d1",
+    "semantic_hash": "4cb5739c1e33353d8f9d66c1737df2d1"
+  },
+  "oikoslab-platform/frontend/lib/types.ts": {
+    "mtime": 1781213872.1862822,
+    "ast_hash": "f3ebc937d3c8e32b7fe40c06b8faf9ec",
+    "semantic_hash": "f3ebc937d3c8e32b7fe40c06b8faf9ec"
+  },
+  "oikoslab-platform/frontend/lib/utils.ts": {
+    "mtime": 1781195701.6947525,
+    "ast_hash": "eda3de374e677f1060382b82cbd2b820",
+    "semantic_hash": "eda3de374e677f1060382b82cbd2b820"
+  },
+  "oikoslab-platform/frontend/next-env.d.ts": {
+    "mtime": 1781182270.2796173,
+    "ast_hash": "2a74d3909800ca5467fa83b0ab4a4890",
+    "semantic_hash": "2a74d3909800ca5467fa83b0ab4a4890"
+  },
+  "oikoslab-platform/frontend/next.config.ts": {
+    "mtime": 1780696809.3188944,
+    "ast_hash": "9b77af189a21a7a64e4bd7a426f64176",
+    "semantic_hash": "9b77af189a21a7a64e4bd7a426f64176"
+  },
+  "oikoslab-platform/frontend/package.json": {
+    "mtime": 1781275894.2405574,
+    "ast_hash": "8884f42607134b87bc436be29cc915f3",
+    "semantic_hash": "8884f42607134b87bc436be29cc915f3"
+  },
+  "oikoslab-platform/frontend/postcss.config.mjs": {
+    "mtime": 1780696809.2568107,
+    "ast_hash": "239f3ebf717465dc636818a1a619398d",
+    "semantic_hash": "239f3ebf717465dc636818a1a619398d"
+  },
+  "oikoslab-platform/frontend/proxy.ts": {
+    "mtime": 1780770337.4053872,
+    "ast_hash": "43e1e2b7668cbfba37e978fb4cdcb915",
+    "semantic_hash": "43e1e2b7668cbfba37e978fb4cdcb915"
+  },
+  "oikoslab-platform/frontend/tsconfig.json": {
+    "mtime": 1780769512.3697338,
+    "ast_hash": "02fc19ad21338c2ab820a70136310db4",
+    "semantic_hash": "02fc19ad21338c2ab820a70136310db4"
+  },
+  "package.json": {
+    "mtime": 1781200144.1417973,
+    "ast_hash": "f1b74d37bb575d03bdca92f0cbbe3f2f",
+    "semantic_hash": "f1b74d37bb575d03bdca92f0cbbe3f2f"
+  },
+  "oikoslab-platform/frontend/public/logo-oikoslab.png": {
+    "mtime": 1781198688.0032434,
+    "ast_hash": "76462fea622b6e7d5a0bb5c2f477bec9",
+    "semantic_hash": "76462fea622b6e7d5a0bb5c2f477bec9"
+  }
+}

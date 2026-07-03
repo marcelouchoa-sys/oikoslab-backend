@@ -1,0 +1,528 @@
+{
+  "communities": {
+    "0": [
+      "frontend_package_dependencies",
+      "frontend_package_dependencies_class_variance_authority",
+      "frontend_package_dependencies_clsx",
+      "frontend_package_dependencies_html2canvas",
+      "frontend_package_dependencies_jspdf",
+      "frontend_package_dependencies_katex",
+      "frontend_package_dependencies_lucide_react",
+      "frontend_package_dependencies_mathlive",
+      "frontend_package_dependencies_next",
+      "frontend_package_dependencies_plotly_js",
+      "frontend_package_dependencies_radix_ui_react_accordion",
+      "frontend_package_dependencies_radix_ui_react_dialog",
+      "frontend_package_dependencies_radix_ui_react_icons",
+      "frontend_package_dependencies_radix_ui_react_label",
+      "frontend_package_dependencies_radix_ui_react_navigation_menu",
+      "frontend_package_dependencies_radix_ui_react_slot",
+      "frontend_package_dependencies_react",
+      "frontend_package_dependencies_react_dom",
+      "frontend_package_dependencies_react_katex",
+      "frontend_package_dependencies_react_plotly_js",
+      "frontend_package_dependencies_supabase_ssr",
+      "frontend_package_dependencies_supabase_supabase_js",
+      "frontend_package_dependencies_tailwind_merge",
+      "frontend_package_dependencies_three",
+      "frontend_package_dependencies_tiptap_extension_blockquote",
+      "frontend_package_dependencies_tiptap_extension_bullet_list",
+      "frontend_package_dependencies_tiptap_extension_color",
+      "frontend_package_dependencies_tiptap_extension_heading",
+      "frontend_package_dependencies_tiptap_extension_highlight",
+      "frontend_package_dependencies_tiptap_extension_horizontal_rule",
+      "frontend_package_dependencies_tiptap_extension_link",
+      "frontend_package_dependencies_tiptap_extension_ordered_list",
+      "frontend_package_dependencies_tiptap_extension_placeholder",
+      "frontend_package_dependencies_tiptap_extension_text_align",
+      "frontend_package_dependencies_tiptap_extension_text_style",
+      "frontend_package_dependencies_tiptap_extension_typography",
+      "frontend_package_dependencies_tiptap_extension_underline",
+      "frontend_package_dependencies_tiptap_pm",
+      "frontend_package_dependencies_tiptap_react",
+      "frontend_package_dependencies_tiptap_starter_kit",
+      "frontend_package_dependencies_xyflow_react"
+    ],
+    "1": [
+      "app_page",
+      "app_page_ctapage",
+      "app_page_webglshader",
+      "lib_utils",
+      "lib_utils_cn",
+      "ui_accordion",
+      "ui_accordion_accordioncontent",
+      "ui_accordion_accordionitem",
+      "ui_accordion_accordiontrigger",
+      "ui_button",
+      "ui_button_button",
+      "ui_button_buttonprops",
+      "ui_button_buttonvariants",
+      "ui_cta_section",
+      "ui_cta_section_ctasection",
+      "ui_cta_section_webglshader",
+      "ui_liquid_glass_button",
+      "ui_liquid_glass_button_glassfilter",
+      "ui_liquid_glass_button_liquidbutton",
+      "ui_liquid_glass_button_liquidbuttonvariants",
+      "ui_navigation_menu",
+      "ui_navigation_menu_navigationmenu",
+      "ui_navigation_menu_navigationmenucontent",
+      "ui_navigation_menu_navigationmenulist",
+      "ui_navigation_menu_navigationmenutrigger",
+      "ui_navigation_menu_navigationmenutriggerstyle",
+      "ui_navigation_menu_navigationmenuviewport",
+      "ui_sheet",
+      "ui_sheet_sheetcontent",
+      "ui_sheet_sheetdescription",
+      "ui_sheet_sheetheader",
+      "ui_sheet_sheetoverlay",
+      "ui_sheet_sheettitle"
+    ],
+    "2": [
+      "construtor_page",
+      "construtor_page_construtorpage",
+      "construtor_page_equacao",
+      "construtor_page_parametro",
+      "construtor_page_plot",
+      "construtor_page_referencia",
+      "construtor_page_secao",
+      "construtor_page_sensibilidade",
+      "construtor_page_uid",
+      "editor_page",
+      "editor_page_editorpage",
+      "editor_page_equacao",
+      "editor_page_historicosimulacoes",
+      "editor_page_notabloco",
+      "editor_page_parametro",
+      "editor_page_plot",
+      "editor_page_resultado",
+      "editor_page_uid",
+      "lib_api",
+      "lib_api_api",
+      "lib_api_post",
+      "ui_math_editor",
+      "ui_math_editor_matheditor",
+      "ui_math_editor_matheditorprops",
+      "ui_math_editor_simbolos_grid",
+      "ui_math_editor_templates",
+      "ui_rich_editor",
+      "ui_rich_editor_richeditor",
+      "ui_rich_editor_richeditorprops",
+      "ui_rich_editor_toolbarbutton"
+    ],
+    "3": [
+      "economia_real_page",
+      "economia_real_page_dadoserie",
+      "economia_real_page_economiarealpage",
+      "economia_real_page_pais",
+      "economia_real_page_plot",
+      "id_page",
+      "id_page_projetoredirect",
+      "lib_supabase",
+      "lib_supabase_createclient",
+      "login_page",
+      "login_page_loginpage",
+      "novo_page",
+      "novo_page_novoprojeto",
+      "novo_page_tipos",
+      "perfil_page",
+      "perfil_page_perfilpage",
+      "simulador_dinamico_page",
+      "simulador_dinamico_page_choque",
+      "simulador_dinamico_page_choques_predefinidos",
+      "simulador_dinamico_page_cores_escola",
+      "simulador_dinamico_page_plot",
+      "simulador_dinamico_page_simuladordinamicopage",
+      "visual_page",
+      "visual_page_editorvisualpage",
+      "visual_page_equacaonode",
+      "visual_page_floweditor",
+      "visual_page_floweditorprops",
+      "visual_page_nodetypes",
+      "visual_page_parametronode",
+      "visual_page_resultadonode"
+    ],
+    "4": [
+      "basemodel",
+      "routers_funcoes",
+      "routers_funcoes_calcular_consumo",
+      "routers_funcoes_calcular_investimento",
+      "routers_funcoes_paramsconsumo",
+      "routers_funcoes_paramsinvestimento",
+      "routers_modelo_proprio",
+      "routers_modelo_proprio_detectar",
+      "routers_modelo_proprio_equacao",
+      "routers_modelo_proprio_listar_blocos",
+      "routers_modelo_proprio_modeloinput",
+      "routers_modelo_proprio_obter_bloco",
+      "routers_modelo_proprio_obter_modelo_pronto",
+      "routers_modelo_proprio_parametro",
+      "routers_modelo_proprio_rationale_103",
+      "routers_modelo_proprio_rationale_58",
+      "routers_modelo_proprio_rationale_71",
+      "routers_modelo_proprio_resolver_modelo",
+      "routers_modelo_proprio_resolver_sistema",
+      "routers_modelo_proprio_split_equacao",
+      "routers_modelo_proprio_validar_expressao",
+      "routers_modelo_proprio_variavellivre"
+    ],
+    "5": [
+      "frontend_package",
+      "frontend_package_devdependencies",
+      "frontend_package_devdependencies_eslint",
+      "frontend_package_devdependencies_eslint_config_next",
+      "frontend_package_devdependencies_tailwindcss",
+      "frontend_package_devdependencies_tailwindcss_postcss",
+      "frontend_package_devdependencies_types_katex",
+      "frontend_package_devdependencies_types_node",
+      "frontend_package_devdependencies_types_react",
+      "frontend_package_devdependencies_types_react_dom",
+      "frontend_package_devdependencies_types_react_katex",
+      "frontend_package_devdependencies_types_react_plotly_js",
+      "frontend_package_devdependencies_types_three",
+      "frontend_package_devdependencies_typescript",
+      "frontend_package_name",
+      "frontend_package_private",
+      "frontend_package_scripts",
+      "frontend_package_scripts_build",
+      "frontend_package_scripts_dev",
+      "frontend_package_scripts_lint",
+      "frontend_package_scripts_start",
+      "frontend_package_version"
+    ],
+    "6": [
+      "frontend_tsconfig",
+      "frontend_tsconfig_compileroptions",
+      "frontend_tsconfig_compileroptions_allowjs",
+      "frontend_tsconfig_compileroptions_esmoduleinterop",
+      "frontend_tsconfig_compileroptions_incremental",
+      "frontend_tsconfig_compileroptions_isolatedmodules",
+      "frontend_tsconfig_compileroptions_jsx",
+      "frontend_tsconfig_compileroptions_lib",
+      "frontend_tsconfig_compileroptions_module",
+      "frontend_tsconfig_compileroptions_moduleresolution",
+      "frontend_tsconfig_compileroptions_noemit",
+      "frontend_tsconfig_compileroptions_paths",
+      "frontend_tsconfig_compileroptions_plugins",
+      "frontend_tsconfig_compileroptions_resolvejsonmodule",
+      "frontend_tsconfig_compileroptions_skiplibcheck",
+      "frontend_tsconfig_compileroptions_strict",
+      "frontend_tsconfig_compileroptions_target",
+      "frontend_tsconfig_exclude",
+      "frontend_tsconfig_include",
+      "frontend_tsconfig_paths"
+    ],
+    "7": [
+      "routers_simulador_dinamico",
+      "routers_simulador_dinamico_ajuste_estrutural",
+      "routers_simulador_dinamico_calibrar_naturais",
+      "routers_simulador_dinamico_choque",
+      "routers_simulador_dinamico_choques_predefinidos",
+      "routers_simulador_dinamico_configeconomia",
+      "routers_simulador_dinamico_descricao",
+      "routers_simulador_dinamico_funcao_resposta_impulso",
+      "routers_simulador_dinamico_media",
+      "routers_simulador_dinamico_montar_analise",
+      "routers_simulador_dinamico_params_escola",
+      "routers_simulador_dinamico_rationale_127",
+      "routers_simulador_dinamico_rationale_157",
+      "routers_simulador_dinamico_rationale_340",
+      "routers_simulador_dinamico_rationale_86",
+      "routers_simulador_dinamico_simulacaoinput",
+      "routers_simulador_dinamico_simular",
+      "routers_simulador_dinamico_simular_trajetoria"
+    ],
+    "8": [
+      "dashboard_page",
+      "dashboard_page_dashboardpage",
+      "dashboard_page_tipo_cor",
+      "dashboard_page_tipo_label",
+      "lib_supabase_server",
+      "lib_supabase_server_createserversupabaseclient",
+      "lib_types",
+      "lib_types_compartilhamento",
+      "lib_types_profile",
+      "lib_types_projeto",
+      "logout_route",
+      "logout_route_post",
+      "projetos_page",
+      "projetos_page_projetospage",
+      "projetos_page_tipo_borda",
+      "projetos_page_tipo_cor",
+      "projetos_page_tipo_label"
+    ],
+    "9": [
+      "claudef_md_AGENTS.md",
+      "requirements_fastapi",
+      "requirements_numpy",
+      "requirements_pydantic",
+      "requirements_python-dotenv",
+      "requirements_scipy",
+      "requirements_supabase",
+      "requirements_sympy",
+      "requirements_uvicorn",
+      "runtime_Procfile",
+      "runtime_python-3.11.9"
+    ],
+    "10": [
+      "contato_page",
+      "contato_page_contatopage",
+      "home_page",
+      "home_page_homepage",
+      "sobre_page",
+      "sobre_page_sobrepage",
+      "ui_oikos_navbar",
+      "ui_oikos_navbar_oikosnavbar"
+    ],
+    "11": [
+      "routers_economia_real",
+      "routers_economia_real_buscar_dados",
+      "routers_economia_real_buscar_world_bank",
+      "routers_economia_real_calibrar_modelo",
+      "routers_economia_real_listar_paises",
+      "routers_economia_real_rationale_87"
+    ],
+    "12": [
+      "app_layout",
+      "app_layout_geistmono",
+      "app_layout_geistsans",
+      "app_layout_metadata",
+      "app_layout_rootlayout"
+    ],
+    "13": [
+      "routers_islmbp",
+      "routers_islmbp_calcular_curvas",
+      "routers_islmbp_calcular_equilibrio",
+      "routers_islmbp_parametrosislm",
+      "routers_islmbp_resolver"
+    ],
+    "14": [
+      "backend_python_simulators",
+      "decisoes_md_architecture",
+      "estado_atual_md_state",
+      "nextjs_project"
+    ],
+    "15": [
+      "blog_page",
+      "blog_page_artigos",
+      "blog_page_blogpage"
+    ],
+    "16": [
+      "frontend_proxy",
+      "frontend_proxy_config",
+      "frontend_proxy_proxy"
+    ],
+    "17": [
+      "package",
+      "package_dependencies",
+      "package_dependencies_lucide_react"
+    ],
+    "18": [
+      "backend_main",
+      "backend_main_root"
+    ],
+    "19": [
+      "frontend_eslint_config",
+      "frontend_eslint_config_eslintconfig"
+    ],
+    "20": [
+      "frontend_next_config",
+      "frontend_next_config_nextconfig"
+    ],
+    "21": [
+      "frontend_postcss_config",
+      "frontend_postcss_config_config"
+    ],
+    "22": [
+      "roadmap_roadmap",
+      "visao-geral_visao_geral"
+    ],
+    "23": [
+      "ui_web_gl_shader",
+      "ui_web_gl_shader_webglshader"
+    ],
+    "24": [
+      "file_svg"
+    ],
+    "25": [
+      "frontend_next_env_d"
+    ],
+    "26": [
+      "globe_svg"
+    ],
+    "27": [
+      "image_1"
+    ],
+    "28": [
+      "next_svg"
+    ],
+    "29": [
+      "oikoslab_platform_frontend_docs_changelog_md"
+    ],
+    "30": [
+      "oikoslab_platform_frontend_readme_md"
+    ],
+    "31": [
+      "oikoslab_platform_frontend_vercel_readme_txt"
+    ],
+    "32": [
+      "routers_init"
+    ],
+    "33": [
+      "vercel_svg"
+    ],
+    "34": [
+      "window_svg"
+    ]
+  },
+  "cohesion": {
+    "0": 0.04878048780487805,
+    "1": 0.07954545454545454,
+    "2": 0.08045977011494253,
+    "3": 0.09885057471264368,
+    "4": 0.15151515151515152,
+    "5": 0.09090909090909091,
+    "6": 0.1,
+    "7": 0.23529411764705882,
+    "8": 0.18382352941176472,
+    "9": 0.18181818181818182,
+    "10": 0.35714285714285715,
+    "11": 0.4,
+    "12": 0.4,
+    "13": 0.9,
+    "14": 0.6666666666666666,
+    "15": 0.6666666666666666,
+    "16": 0.6666666666666666,
+    "17": 0.6666666666666666,
+    "18": 1.0,
+    "19": 1.0,
+    "20": 1.0,
+    "21": 1.0,
+    "22": 1.0,
+    "23": 1.0,
+    "24": 1.0,
+    "25": 1.0,
+    "26": 1.0,
+    "27": 1.0,
+    "28": 1.0,
+    "29": 1.0,
+    "30": 1.0,
+    "31": 1.0,
+    "32": 1.0,
+    "33": 1.0,
+    "34": 1.0
+  },
+  "gods": [
+    {
+      "id": "lib_supabase_createclient",
+      "label": "createClient()",
+      "degree": 19
+    },
+    {
+      "id": "frontend_tsconfig_compileroptions",
+      "label": "compilerOptions",
+      "degree": 16
+    },
+    {
+      "id": "runtime_python-3.11.9",
+      "label": "Python 3.11.9",
+      "degree": 10
+    },
+    {
+      "id": "routers_simulador_dinamico_simular_trajetoria",
+      "label": "_simular_trajetoria()",
+      "degree": 8
+    },
+    {
+      "id": "lib_utils_cn",
+      "label": "cn()",
+      "degree": 8
+    },
+    {
+      "id": "lib_supabase_server_createserversupabaseclient",
+      "label": "createServerSupabaseClient()",
+      "degree": 7
+    },
+    {
+      "id": "routers_modelo_proprio_split_equacao",
+      "label": "_split_equacao()",
+      "degree": 6
+    },
+    {
+      "id": "routers_simulador_dinamico_params_escola",
+      "label": "_params_escola()",
+      "degree": 6
+    },
+    {
+      "id": "routers_simulador_dinamico_simular",
+      "label": "simular()",
+      "degree": 6
+    },
+    {
+      "id": "routers_islmbp_parametrosislm",
+      "label": "ParametrosISLM",
+      "degree": 5
+    }
+  ],
+  "surprises": [
+    {
+      "source": "POST()",
+      "target": "createServerSupabaseClient()",
+      "source_files": [
+        "oikoslab-platform/frontend/app/auth/logout/route.ts",
+        "oikoslab-platform/frontend/lib/supabase-server.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "peripheral node `POST()` unexpectedly reaches hub `createServerSupabaseClient()`"
+    },
+    {
+      "source": "DashboardPage()",
+      "target": "createServerSupabaseClient()",
+      "source_files": [
+        "oikoslab-platform/frontend/app/dashboard/page.tsx",
+        "oikoslab-platform/frontend/lib/supabase-server.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "peripheral node `DashboardPage()` unexpectedly reaches hub `createServerSupabaseClient()`"
+    },
+    {
+      "source": "LoginPage()",
+      "target": "createClient()",
+      "source_files": [
+        "oikoslab-platform/frontend/app/login/page.tsx",
+        "oikoslab-platform/frontend/lib/supabase.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "peripheral node `LoginPage()` unexpectedly reaches hub `createClient()`"
+    },
+    {
+      "source": "PerfilPage()",
+      "target": "createClient()",
+      "source_files": [
+        "oikoslab-platform/frontend/app/perfil/page.tsx",
+        "oikoslab-platform/frontend/lib/supabase.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "peripheral node `PerfilPage()` unexpectedly reaches hub `createClient()`"
+    },
+    {
+      "source": "ConstrutorPage()",
+      "target": "createClient()",
+      "source_files": [
+        "oikoslab-platform/frontend/app/projetos/[id]/construtor/page.tsx",
+        "oikoslab-platform/frontend/lib/supabase.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "bridges separate communities"
+    }
+  ],
+  "tokens": {
+    "input": 15527,
+    "output": 3419
+  }
+}

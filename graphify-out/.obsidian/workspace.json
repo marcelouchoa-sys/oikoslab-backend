@@ -1,0 +1,201 @@
+{
+  "main": {
+    "id": "20840b5a9da1221d",
+    "type": "split",
+    "children": [
+      {
+        "id": "137a8f996ab4ca85",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "e8029486db66affc",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Visualização em gráfico"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "10002e94f4892449",
+    "type": "split",
+    "children": [
+      {
+        "id": "6f6567f4e3d510e4",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "44068dd3823eb975",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Explorador de arquivos"
+            }
+          },
+          {
+            "id": "9475162059742cc0",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Procurar"
+            }
+          },
+          {
+            "id": "5ee0faae8195203e",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Marcadores"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "0531eb9aa341ede3",
+    "type": "split",
+    "children": [
+      {
+        "id": "a3cb1d03971c5ff3",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d387e08fb2da0d40",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "2026-06-15/GRAPH_REPORT.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Links inversos para GRAPH_REPORT"
+            }
+          },
+          {
+            "id": "51915753808ba916",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "2026-06-15/GRAPH_REPORT.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Links de saída para GRAPH_REPORT"
+            }
+          },
+          {
+            "id": "a4cbd2bba6b77d8b",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Etiquetas"
+            }
+          },
+          {
+            "id": "79c207ad81ce7b70",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Todas as propriedades"
+            }
+          },
+          {
+            "id": "f2b5db3e25161f15",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "2026-06-15/GRAPH_REPORT.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Sumário de GRAPH_REPORT"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Abrir a troca rápida": false,
+      "graph:Abrir visualização em gráfico": false,
+      "canvas:Criar novo canvas": false,
+      "daily-notes:Abrir a nota de hoje": false,
+      "templates:Inserir modelo": false,
+      "command-palette:Abrir paleta de comandos": false,
+      "bases:Criar nova base": false
+    }
+  },
+  "active": "e8029486db66affc",
+  "lastOpenFiles": [
+    "2026-06-15/GRAPH_REPORT.md",
+    "GRAPH_REPORT.md",
+    "Sem título.canvas",
+    "Sem título.md",
+    "Sem título 1.canvas",
+    "_COMMUNITY_Community 22.md",
+    "Sem título",
+    "cache/semantic/fcb50e80bc3bb4b16d1078948d8ecf4891aaab45f9b9c232d592eeae3dca0ae9.json",
+    "cache/semantic/ad125bba841ef0f93ad2cc17f8f8740f290a6c12d3ed00ac4a3d9f45ab6b3f3a.json",
+    "cache/semantic/2d0886a49fa061a4d2935a35cbb017270f5c218512090fbb6223a1423038f0f7.json",
+    "cache/semantic/75f19f789eddb46e5eb8b20b7847c7fc4a39d0744f0f6e39f98637abe0eace43.json",
+    "cache/semantic/4b74f67c4b6febf55933bc30cd8fa9a2da8e473624fdc2644aa167ff05f5a7e1.json",
+    "cache/semantic/da21dddd970e759e7a3b64a605ab26ff9b9f9864aaf3100efac4b2c4c0c33578.json",
+    "cache/semantic/cbdc82528a285b47fc665e5d532fe2a062802457da18aabab35e9299e4dc6cd3.json",
+    "cache/semantic/e2a918400cbc2d85e3ac08adfc07a5b2f3e75d121c96ec8d749e06879d83d26a.json",
+    "cache/semantic/eb70d4b036c6923064a358e613cd1097b9c373413667b6e5b583026d48a48502.json"
+  ]
+}
