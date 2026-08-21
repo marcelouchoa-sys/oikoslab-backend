@@ -23,6 +23,11 @@ from services.validador import (
     aplicar_validacao_economica,
     RESTRICOES_PADRAO,
 )
+from services.dependency_graph import (
+    resolver_grafo_versionado,
+    detectar_ciclos,
+    DependenciaNaoResolvidaError,
+)
 
 
 class EconomyEngine:
@@ -45,15 +50,46 @@ class EconomyEngine:
         parametros: dict[str, float],
         variavel_livre=None,
         sensibilidades: list | None = None,
+        funcoes_grafo: list | None = None,
     ) -> dict:
         """
         Pipeline completo — retorna o contrato {valores, matematica, solucao, economia}.
 
         Em fail_fast com violações bloqueantes: retorna {status:'invalid_solution', ...}
         sem nenhum valor numérico da solução.
+
+        `funcoes_grafo` (opcional): lista de objetos com `.funcao_id`/
+        `.funcao_versao_id`/`.depende_de` representando as `Funcao`
+        reutilizáveis (na versão exata pinada por esta modelo_versao) que
+        compõem este modelo (não as equações em si — ver
+        services/dependency_graph.py:resolver_grafo_versionado).
+        `depende_de` referencia `funcao_id` (identidade estável); a
+        resolução pra `funcao_versao_id` acontece a partir do próprio
+        `funcoes_grafo` antes de qualquer detecção de ciclo. Quando
+        fornecido, roda resolução + detecção de ciclo ANTES de qualquer
+        tentativa de solve; se houver ciclo — ou uma dependência não
+        resolvida (funcao_id ausente do payload) — o solver nunca é
+        chamado. Nenhum call site atual passa esse parâmetro (nem
+        /modelo/resolver, que recebe equações soltas sem ligação com
+        `Funcao.depende_de`, nem IS-LM, nem o simulador dinâmico) — fica
+        pronto para quando existir um endpoint que resolve um modelo a
+        partir de um `modelo_versao_id` real.
+        TODO: usar a ORDEM topológica (não só a detecção de ciclo) para
+        recálculo em cascata parcial, se um dia o solver deixar de resolver
+        tudo simultâneo via sp.solve().
         """
         if sensibilidades is None:
             sensibilidades = []
+
+        # ── 0. GRAFO DE DEPENDÊNCIAS (opcional) ──────────────────────────────
+        if funcoes_grafo:
+            try:
+                grafo = resolver_grafo_versionado(funcoes_grafo)
+            except DependenciaNaoResolvidaError as exc:
+                return cls._format_dependencia_nao_resolvida(exc)
+            ciclos = detectar_ciclos(grafo)
+            if ciclos:
+                return cls._format_cycle_error(ciclos, funcoes_grafo)
 
         # ── 1. PARSE + DEDUP ────────────────────────────────────────────────
         equacoes_unicas, equacoes_norm = cls._parse(equacoes)
@@ -291,6 +327,71 @@ class EconomyEngine:
     # ──────────────────────────────────────────────────────────────────────────
     #  RESULT GATE
     # ──────────────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _format_cycle_error(ciclos: list[list[str]], funcoes_grafo: list) -> dict:
+        """
+        Bloqueio ANTES do solve — dependência circular entre `Funcao` (não
+        entre variáveis de uma equação; sp.solve resolve simultaneidade de
+        variáveis numa boa, isso aqui é sobre reuso de Funcao A -> B -> A).
+
+        `ciclos` contém `funcao_versao_id` (nó do grafo versionado — ver
+        resolver_grafo_versionado), por isso `nomes` é indexado por
+        `funcao_versao_id`, não por `funcao_id`.
+
+        Mesmo formato de saída de _format_invalid (status='invalid_solution'),
+        pra quem consome o contrato de run() não precisar tratar dois formatos
+        de erro diferentes.
+        """
+        nomes = {f.funcao_versao_id: (f.nome or f.funcao_versao_id) for f in funcoes_grafo}
+        ciclos_nomeados = [[nomes.get(cid, cid) for cid in ciclo] for ciclo in ciclos]
+        mensagens = [
+            "Dependência circular: " + " → ".join(nomeado + [nomeado[0]])
+            for nomeado in ciclos_nomeados
+        ]
+        return {
+            "status": "invalid_solution",
+            "errors": mensagens,
+            "violations": [],
+            "economia": {
+                "valid":                   False,
+                "warnings":                [],
+                "errors":                  [{"tipo": "ciclo_dependencia", "mensagem": m} for m in mensagens],
+                "violations":              [],
+                "restricoes":              RESTRICOES_PADRAO,
+                "consistencia":            [],
+                "consistencia_estrutural": [],
+                "interpretacao":           [],
+            },
+            "ciclos": ciclos,
+            "ciclos_nomes": ciclos_nomeados,
+        }
+
+    @staticmethod
+    def _format_dependencia_nao_resolvida(exc: DependenciaNaoResolvidaError) -> dict:
+        """
+        Bloqueio ANTES do solve — `depende_de` referencia um `funcao_id`
+        ausente do `funcoes_grafo` recebido (snapshot de modelo_versao
+        incompleto). Mesmo formato de saída de _format_cycle_error/
+        _format_invalid, mesmo motivo: um único contrato de erro pra quem
+        consome run() não precisar tratar formatos diferentes.
+        """
+        mensagem = str(exc)
+        return {
+            "status": "invalid_solution",
+            "errors": [mensagem],
+            "violations": [],
+            "economia": {
+                "valid":                   False,
+                "warnings":                [],
+                "errors":                  [{"tipo": "dependencia_nao_resolvida", "mensagem": mensagem}],
+                "violations":              [],
+                "restricoes":              RESTRICOES_PADRAO,
+                "consistencia":            [],
+                "consistencia_estrutural": [],
+                "interpretacao":           [],
+            },
+        }
 
     @staticmethod
     def _format_invalid(

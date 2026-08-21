@@ -1,6 +1,9 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from urllib.parse import quote
 import httpx
+
+from services.parse_numero import parse_numero_br
 
 router = APIRouter()
 
@@ -149,3 +152,120 @@ async def calibrar_modelo(pais: str, ano_ini: int, ano_fim: int):
         },
         "series_historicas": dados,
     }
+
+
+# ── SIDRA (IBGE) — Data Hub v1 ────────────────────────────────────────
+# API totalmente aberta, sem autenticação (verificado ao vivo contra
+# apisidra.ibge.gov.br em 2026-08). Formato: array JSON onde o PRIMEIRO
+# elemento é um dicionário de descritores de coluna (não é dado), os
+# demais são as observações reais.
+
+_MARCADORES_SUPRIMIDOS = {"-", "..", "...", "X"}
+
+def _parse_valor_sidra(valor_bruto: str) -> float | None:
+    """
+    O SIDRA usa marcadores de texto pra dado suprimido/indisponível
+    ('-', '..', '...', 'X') em vez de omitir o ponto. Nesses casos (ou em
+    qualquer valor que não parseie) retorna None — quem chama preserva o
+    valor_bruto original separadamente pra auditoria.
+
+    Delega o parse pra `parse_numero_br` (formato brasileiro: ponto pode
+    ser milhar, vírgula é decimal) em vez de `float()` puro — o "V" bruto
+    do SIDRA nunca traz separador de milhar nos casos testados (PIB,
+    população: sempre dígitos corridos), mas essa função é o ponto único
+    de conversão texto->número pra dado importado, então blindada aqui
+    também por precaução, não só nos pontos que o bug original afetou.
+    """
+    texto = (valor_bruto or "").strip()
+    if not texto or texto in _MARCADORES_SUPRIMIDOS:
+        return None
+    try:
+        return parse_numero_br(texto)
+    except ValueError:
+        return None
+
+
+async def buscar_sidra(
+    tabela: str, variavel: str, localidade: str = "1", periodos: str = "last 6", nivel: str = "1"
+) -> dict:
+    """
+    Busca uma série do SIDRA (IBGE) — tabela/variável/localidade seguem
+    os códigos do próprio SIDRA (ex: tabela '6381', variável '4099' =
+    Taxa de desocupação PNAD Contínua trimestral, localidade '1' = Brasil).
+
+    `nivel` é o nível territorial do SIDRA (n1=Brasil, n3=Estado, n6=
+    Município — códigos do próprio SIDRA). Default '1' preserva o
+    comportamento original (Brasil) pra todo chamador que não passar
+    `nivel` explicitamente. v1 do Data Hub só expõe Brasil e Município
+    pelo endpoint HTTP (ver `sidra_serie` abaixo) — Estado fica de fora
+    por não ter caso de uso ainda, não é limitação técnica desta função.
+
+    LIMITAÇÃO CONHECIDA (Data Hub v1): esta função devolve a série
+    inteira dos períodos pedidos, mas o mapeamento de variável
+    (variavel_mapeamentos) sempre usa o ÚLTIMO ponto — não há seletor de
+    período nem uso da série completa num parâmetro ainda. Série
+    histórica completa (Canvas dinâmico, estimação) é v2+.
+    """
+    url = (
+        f"https://apisidra.ibge.gov.br/values/t/{tabela}/n{nivel}/{localidade}"
+        f"/v/{variavel}/p/{quote(periodos)}"
+    )
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.get(url)
+        if resp.status_code != 200:
+            raise HTTPException(
+                502, f"SIDRA respondeu {resp.status_code} para tabela {tabela}, variável {variavel}."
+            )
+        data = resp.json()
+
+    if not isinstance(data, list) or len(data) < 2:
+        raise HTTPException(404, f"Nenhum dado encontrado para tabela {tabela}, variável {variavel}.")
+
+    linhas = data[1:]  # primeiro elemento é o descritor de colunas, não dado
+
+    pontos = [
+        {
+            "periodo_codigo": linha.get("D3C", ""),
+            "periodo_label":  linha.get("D3N", ""),
+            "valor":          _parse_valor_sidra(linha.get("V", "")),
+            "valor_bruto":    linha.get("V", ""),
+        }
+        for linha in linhas
+    ]
+
+    primeira = linhas[0]
+    return {
+        "tabela":        tabela,
+        "variavel":      variavel,
+        "localidade":    localidade,
+        "nivel":         nivel,
+        "unidade":       primeira.get("MN"),
+        "nome_variavel": primeira.get("D2N"),
+        "fonte_url":     url,
+        "pontos":        pontos,
+    }
+
+
+@router.get("/sidra/{tabela}/{variavel}")
+async def sidra_serie(
+    tabela: str,
+    variavel: str,
+    localidade: str = "1",
+    periodos: str = "last 6",
+    municipio: str | None = None,
+):
+    """
+    Preview de uma série SIDRA antes de importar — ver buscar_sidra().
+
+    Por padrão busca nível Brasil (n1, localidade='1') — comportamento
+    inalterado, os atalhos existentes (Taxa de Desemprego, PIB
+    Trimestral) continuam batendo aqui exatamente como antes. Se
+    `municipio` vier preenchido (código IBGE de 7 dígitos, ex: 3305109 =
+    Seropédica-RJ), busca nível Município (n6) com esse código em vez de
+    Brasil. v1 do Data Hub não expõe Estado (n3) nem um seletor de nível
+    territorial completo — decisão explícita: o caso de uso real hoje é
+    só Brasil ou Município, um seletor genérico seria over-engineering.
+    """
+    if municipio:
+        return await buscar_sidra(tabela, variavel, localidade=municipio, periodos=periodos, nivel="6")
+    return await buscar_sidra(tabela, variavel, localidade=localidade, periodos=periodos)

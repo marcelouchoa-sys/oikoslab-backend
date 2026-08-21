@@ -12,14 +12,38 @@ Toda lógica de resolução, validação e formatação vive em EconomyEngine.
 Nenhuma chamada direta ao solver é feita aqui.
 """
 
+from typing import Annotated
+
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, BeforeValidator
 import sympy as sp
 
 from services.validador import simular_cenario as _simular_cenario
 from services.economy_engine import EconomyEngine
+from services.parse_numero import parse_numero_br
+from services.dependency_graph import (
+    resolver_grafo_versionado,
+    ordenar_topologicamente,
+    DependenciaNaoResolvidaError,
+)
 
 router = APIRouter()
+
+
+def _converter_se_string(v):
+    """BeforeValidator: só strings passam por parse_numero_br (formato BR
+    -- ponto pode ser milhar, vírgula é decimal); número já vem inequívoco
+    do JSON e passa direto. Defesa em profundidade: o frontend hoje já
+    manda `valor` como número (nunca string) pra estes campos, mas um
+    valor de parâmetro é exatamente o tipo de dado que já vazou como
+    string BR-formatada uma vez (bug real: "80.596" virando 80.596 em vez
+    de 80596) -- essa validação garante que, mesmo se algo no futuro
+    (frontend, script, chamada direta à API) mandar string aqui de novo,
+    o parse é seguro."""
+    return parse_numero_br(v) if isinstance(v, str) else v
+
+
+NumeroBR = Annotated[float, BeforeValidator(_converter_se_string)]
 
 
 # =============================================================
@@ -28,7 +52,7 @@ router = APIRouter()
 
 class Parametro(BaseModel):
     nome:      str
-    valor:     float
+    valor:     NumeroBR
     descricao: str = ""
 
 
@@ -56,13 +80,46 @@ class ModeloInput(BaseModel):
 class VariacaoInput(BaseModel):
     nome:  str = ""
     param: str
-    valor: float
+    valor: NumeroBR
 
 
 class CenarioInput(BaseModel):
     equacoes:        list[Equacao]
-    parametros_base: dict[str, float]
+    parametros_base: dict[str, NumeroBR]
     variacoes:       list[VariacaoInput]
+
+
+class FuncaoGrafoInput(BaseModel):
+    """
+    Um nó do grafo de dependências de uma modelo_versao específica — ver
+    services/dependency_graph.py:resolver_grafo_versionado (porte
+    versionado de frontend/lib/dependency-graph.ts).
+
+    `funcao_id` é a identidade estável da Funcao — é o que `depende_de`
+    referencia, tanto aqui quanto na coluna `depende_de` do banco (uma
+    expressão referencia "a função Preço", nunca uma versão específica
+    dela). `funcao_versao_id` é a versão EXATA pinada nesta modelo_versao
+    (nunca "a atual" — ver modelo_versao_funcoes em
+    0002_modelos_versionamento.sql); é ela que vira nó do grafo.
+
+    O backend não tem client Supabase configurado hoje, então este
+    endpoint não resolve `modelo_versao_id` sozinho: quem chama (frontend,
+    que já tem acesso ao Supabase) busca modelo_versao_funcoes +
+    funcao_versoes e manda a lista completa aqui — mesmo padrão que
+    /resolver já usa (equações inteiras no payload, sem lookup por id no
+    servidor).
+    """
+    funcao_id:        str
+    funcao_versao_id: str
+    nome:             str = ""
+    variavel:         str = ""
+    variaveis_usadas: list[str] = []
+    depende_de:       list[str] = []
+
+
+class GrafoInput(BaseModel):
+    modelo_versao_id: str | None = None
+    funcoes:          list[FuncaoGrafoInput]
 
 
 # =============================================================
@@ -214,6 +271,35 @@ def resolver_modelo(modelo: ModeloInput) -> dict:
 #  Usa EconomyEngine.resolve_single() — solver sempre gateado.
 # =============================================================
 
+def _anexar_diagnosticos(resultado: dict, diagnosticos: list[dict]) -> dict:
+    """
+    Anexa valido/violacoes a `resultado` (saída de `_simular_cenario`) a
+    partir de `diagnosticos` — um item por chamada de `_resolve`, na mesma
+    ordem: base primeiro, depois cada variação.
+
+    Isolada como função própria (em vez de zip() inline no endpoint) e
+    indexada com fallback explícito: zip() trunca silenciosamente se as
+    duas listas tiverem tamanhos diferentes, o que deixaria cenários no
+    fim da lista sem as chaves valido/violacoes — e `violacoes` ausente
+    (não `[]`) quebra `cen.violacoes.map()` no frontend
+    (construtor/page.tsx). Contrato garantido aqui: TODO cenário sempre
+    sai com `valido: bool` e `violacoes: list` (nunca None/ausente), e um
+    diagnóstico faltando é tratado como inválido (mais seguro do que
+    assumir válido silenciosamente).
+    """
+    diag_base = diagnosticos[0] if diagnosticos else {"valid": False, "violations": []}
+    resultado["base_valido"] = diag_base["valid"]
+    resultado["base_violacoes"] = diag_base["violations"] or []
+
+    diagnosticos_variacoes = diagnosticos[1:]
+    for i, cenario in enumerate(resultado["cenarios"]):
+        diagnostico = diagnosticos_variacoes[i] if i < len(diagnosticos_variacoes) else None
+        cenario["valido"] = diagnostico["valid"] if diagnostico else False
+        cenario["violacoes"] = (diagnostico["violations"] if diagnostico else None) or []
+
+    return resultado
+
+
 @router.post("/simular-cenario")
 def simular_cenarios(payload: CenarioInput) -> dict:
     """
@@ -225,16 +311,40 @@ def simular_cenarios(payload: CenarioInput) -> dict:
         variacoes      : [{'nome': str, 'param': str, 'valor': float}]
 
     Returns:
-        {'base': {valores}, 'cenarios': [{nome, param, valor, solucao, delta}]}
-    """
-    def _resolve(params: dict) -> dict:
-        return EconomyEngine.resolve_single(payload.equacoes, params)['valores']
+        {
+          'base': {valores}, 'base_valido': bool, 'base_violacoes': [...],
+          'cenarios': [{nome, parametro_variado, valor, solucao, delta_vs_base,
+                        valido, violacoes}],
+        }
 
-    return _simular_cenario(
+    `valido`/`violacoes` são novos (aditivo — `base`/`solucao` continuam no
+    mesmo formato de sempre, dict achatado {variavel: valor}). Antes desse
+    campo, `EconomyEngine.resolve_single()` já rodava o hard gate
+    internamente pra cada cenário, mas só `valores` chegava até aqui —
+    `valid`/`violations` eram descartados, então um cenário economicamente
+    inválido aparecia silencioso: no modo padrão (warning) com números
+    que violam restrição mas parecem normais; no modo fail_fast com
+    `solucao` vazio sem explicação nenhuma. Capturado aqui via closure
+    (mesma ordem de chamada de `_resolve`: base primeiro, depois cada
+    variação, na ordem de `payload.variacoes`) — sem duplicar a lógica de
+    validação, que já mora inteira no EconomyEngine. Ver
+    `_anexar_diagnosticos` para a garantia de que violacoes nunca vem
+    ausente/null no JSON de resposta.
+    """
+    diagnosticos: list[dict] = []
+
+    def _resolve(params: dict) -> dict:
+        resultado = EconomyEngine.resolve_single(payload.equacoes, params)
+        diagnosticos.append({"valid": resultado["valid"], "violations": resultado["violations"]})
+        return resultado["valores"]
+
+    resultado = _simular_cenario(
         _resolve,
         payload.parametros_base,
         [v.model_dump() for v in payload.variacoes],
     )
+
+    return _anexar_diagnosticos(resultado, diagnosticos)
 
 
 # =============================================================
@@ -251,3 +361,59 @@ def validar_expressao(payload: dict) -> dict:
         return {"valido": True, "erro": None}
     except Exception as e:
         return {"valido": False, "erro": str(e)}
+
+
+# =============================================================
+#  GRAFO DE DEPENDÊNCIAS ENTRE FUNCAO
+#  Porte de frontend/lib/dependency-graph.ts — ver services/dependency_graph.py.
+# =============================================================
+
+@router.post("/grafo")
+def calcular_grafo(payload: GrafoInput) -> dict:
+    """
+    Ordena topologicamente as `Funcao` de uma modelo_versao e detecta
+    ciclos de dependência (`depende_de` apontando, direta ou
+    indiretamente, de volta pra si mesma). O grafo opera sobre
+    `funcao_versao_id` — a versão exata pinada nesta modelo_versao, não
+    "a função" em geral — resolvida a partir de `depende_de` (que
+    referencia `funcao_id`) via resolver_grafo_versionado.
+
+    Resposta sempre 200 — ciclo NÃO é erro HTTP, é um resultado válido do
+    diagnóstico (mesmo espírito do EconomicHardGate: nunca uma falha
+    genérica, sempre um diagnóstico estruturado). `valido=False` é o sinal
+    de bloqueio; quem chama decide o que fazer (não resolve o modelo, etc).
+    Uma dependência não resolvida (funcao_id ausente do payload — snapshot
+    incompleto) também vira `valido=False` em vez de erro HTTP, pelo mesmo
+    motivo.
+    """
+    try:
+        grafo = resolver_grafo_versionado(payload.funcoes)
+    except DependenciaNaoResolvidaError as exc:
+        return {
+            "ordem_calculo": [],
+            "ciclos":        [],
+            "ciclos_nomes":  [],
+            "valido":        False,
+            "motivo":        str(exc),
+        }
+
+    ordem, ciclos = ordenar_topologicamente(grafo)
+
+    nomes = {f.funcao_versao_id: (f.nome or f.funcao_versao_id) for f in payload.funcoes}
+    ciclos_nomeados = [[nomes.get(cid, cid) for cid in ciclo] for ciclo in ciclos]
+
+    valido = len(ciclos) == 0
+    motivo = None
+    if not valido:
+        motivo = "; ".join(
+            "Dependência circular: " + " → ".join(nomeado + [nomeado[0]])
+            for nomeado in ciclos_nomeados
+        )
+
+    return {
+        "ordem_calculo": ordem,
+        "ciclos":        ciclos,
+        "ciclos_nomes":  ciclos_nomeados,
+        "valido":        valido,
+        "motivo":        motivo,
+    }

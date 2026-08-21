@@ -1,4 +1,8 @@
-# routers/funcoes.py
+# routers/exemplos_didaticos.py
+#
+# Calculadoras didáticas simples (consumo/investimento), sem relação com a
+# tabela Supabase `funcoes` do Construtor de Funções — renomeado de
+# funcoes.py para não colidir de nome com esse outro sistema.
 from fastapi import APIRouter
 from pydantic import BaseModel
 import numpy as np
